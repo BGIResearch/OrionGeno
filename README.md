@@ -32,7 +32,6 @@ The public interface treats OrionGeno as one unified species-conditioned model. 
 
 - [Gene benchmark](docs/benchmark/gene_benchmark.md)
 - [Protein benchmark](docs/benchmark/protein_benchmark.md)
-- [Benchmark index](docs/benchmark/README.md)
 
 ## Installation
 
@@ -52,16 +51,16 @@ pip install oriongeno
 ## Download
 The model can be downloaded via the following link.              
 
-|      model name      |         genome          |           repeats            |
-|:--------------------:|:-----------------------:|:----------------------------:|
-|   `Actinopterygii`   | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-|     `Arthropoda`     | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-|        `Aves`        | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-|       `Fungi`        | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-| `Invertebrate_other` | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-|      `Mammalia`      | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-|       `Plant`        | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
-|  `Vertebrate_other`  | [🤖genmoe](https://xxx) |   [🤖repeats](https://xxx)   |
+|      model name      |                                                                            genome                                                                            |                                                                           repeats                                                                            |
+|:--------------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+|   `Actinopterygii`   |     🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-actinopterygii) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)     |     🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-actinopterygii) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)     |
+|     `Arthropoda`     |       🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-arthropoda) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)       |       🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-arthropoda) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)       |
+|        `Aves`        |          🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-aves) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |          🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-aves) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |
+|       `Fungi`        |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-fungi) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-fungi) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |
+| `Invertebrate_other` | 🤖[modelscope](https://www.modelscope.cn/models/zhangchao162/oriongeno-invertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno) | 🤖[modelscope](https://www.modelscope.cn/models/zhangchao162/oriongeno-invertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno) |
+|      `Mammalia`      |        🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-mammalia) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)        |        🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-mammalia) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)        |
+|       `Plant`        |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-plant) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-plant) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |
+|  `Vertebrate_other`  |    🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-vertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)    |    🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-vertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)    |
 
 
 ## Quick Start
@@ -197,4 +196,4 @@ If you use this codebase, or otherwise find our work valuable, please cite Orion
   year={2026}
 }
 ```
-Please [contact](yinpeng@genomics.cn) us if you have any questions.
+Please [Contact Us](mailto:yinpeng@genomics.cn?subject=Regarding%20OrionGeno%20Feedback) if you have any questions.
