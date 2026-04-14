@@ -1,0 +1,23 @@
+name: oriongeno
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10.18
+  - pip
+  - biopython=1.85
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu126
+      - numpy==2.2.6
+      - einops==0.8.1
+      - typing_extensions>=4.12
+      - torch==2.7.0+cu126
+      - transformers==4.57.3
+      - tokenizers==0.22.2
+      - huggingface_hub==0.34.4
+      - safetensors==0.5.3
+      - mamba-ssm==2.2.5
+      - causal-conv1d==1.5.2
+      - triton==3.3.0
+      - fastapi==0.115.12
+      - uvicorn==0.34.0

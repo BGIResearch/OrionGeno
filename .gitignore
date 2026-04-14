@@ -4,7 +4,6 @@ api_main.py
 .oriongeno_api_tasks.json
 /docs/img/*.pdf
 requirements.txt
-environment.min.yml
 oriongeno/hmm_layer/gene_pred*.py
 oriongeno/hmm_layer/Initializers.py
 oriongeno/hmm_layer/kmer.py
