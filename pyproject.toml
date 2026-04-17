@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "oriongeno"
-version = "1.0.1"
+version = "1.0.2"
 authors = [{ name = "OrionGeno Group", email = "zhangchao5@genomic.cn" }]
 description = "OrionGeno is an end-to-end model for annotating eukaryotic genomes. You give it a genome FASTA and a species name, and it writes gene annotations, repeat annotations, or both in GTF format."
 readme = { text = "OrionGeno is an end-to-end model for annotating eukaryotic genomes. You give it a genome FASTA and a species name, and it writes gene annotations, repeat annotations, or both in GTF format.", content-type = "text/plain" }
@@ -23,8 +23,6 @@ dependencies = [
     'mamba-ssm>=2.2.5',
     'causal-conv1d>=1.5.2',
     'triton==3.3.1',
-    'fastapi==0.115.12',
-    'uvicorn==0.34.0'
 ]
 
 [project.scripts]

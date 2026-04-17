@@ -25,6 +25,7 @@ class RuntimeContext:
     device: str
     backend: str = ""
     work_dir: str = ""
+    quiet: bool = False
 
     @property
     def is_main(self):
@@ -71,6 +72,8 @@ def configure_rank_logging(runtime):
 
 def emit_rank_progress(runtime, message):
     """Print one concise progress line from any rank."""
+    if getattr(runtime, "quiet", False):
+        return
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     print(f"{timestamp} - {runtime.log_prefix} {message}", flush=True)
 

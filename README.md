@@ -1,7 +1,4 @@
-[![python >3.10](https://img.shields.io/badge/python-3.10-brightgreen)](https://www.python.org/)
-[![Downloads](https://static.pepy.tech/badge/oriongeno)](https://pepy.tech/project/oriongeno)
 # Advancing ab initio gene annotation with OrionGeno
-
 <p align="center">
   <strong>OrionGeno takes a genome FASTA and produces gene and repeat annotations in GTF format.</strong>
 </p>
@@ -51,39 +48,24 @@ pip install oriongeno
 ## Download
 The model can be downloaded via the following link.              
 
-|      model name      |                                                                            genome                                                                            |                                                                           repeats                                                                            |
-|:--------------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------:|:------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-|   `Actinopterygii`   |     🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-actinopterygii) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)     |     🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-actinopterygii) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)     |
-|     `Arthropoda`     |       🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-arthropoda) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)       |       🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-arthropoda) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)       |
-|        `Aves`        |          🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-aves) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |          🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-aves) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |
-|       `Fungi`        |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-fungi) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-fungi) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |
-| `Invertebrate_other` | 🤖[modelscope](https://www.modelscope.cn/models/zhangchao162/oriongeno-invertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno) | 🤖[modelscope](https://www.modelscope.cn/models/zhangchao162/oriongeno-invertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno) |
-|      `Mammalia`      |        🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-mammalia) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)        |        🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-mammalia) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)        |
-|       `Plant`        |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-plant) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |         🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-plant) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)          |
-|  `Vertebrate_other`  |    🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-vertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)    |    🤖[modelscope](https://modelscope.cn/models/zhangchao162/oriongeno-vertebrate_other) \| 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno)    |
-
+|             |                          HuggingFace                           |                               modelscope                                |
+|:-----------:|:--------------------------------------------------------------:|:-----------------------------------------------------------------------:|
+| `OrionGeno` | 🤗[HuggingFace](https://huggingface.co/BGI-Research/OrionGeno) | 🤖[modelscope](https://www.modelscope.cn/models/BGI-Research/OrionGeno) |
 
 ## Quick Start
 
-```cli
-oriongeno pipeline \
-    --genome /data/home/GCF.xxx._genomic.fna.gz \
-    --species_name Homo_sapiens \
-    --out /output/home/example.gtf \
-    --batch_size 4 \
-    --model /checkpoints/Mammalia
-```
-
-The default CLI behavior is:
-- `use_gene_annotation=True`
-- `use_repeat_annotation=False`
-- `include_utr=False`
-- `seq_len=512000`
-- `flank_bp=128000`
-
 ### Gene annotation only
 
-This is the default.
+```cli
+oriongeno pipeline \
+    --model /download/checkpoints/home/
+    --genome /data/home/GCF.xxx._genomic.fna.gz
+    --out /output/home/example.gtf
+    --species_name Danio_rerio
+    --batch_size 4
+    --use_gene_annotation true
+    --strand +
+```
 
 ### Repeat annotation only
 
@@ -94,43 +76,25 @@ oriongeno pipeline \
     --out /output/home/example.gtf \
     --batch_size 4 \
     --model /checkpoints/Mammalia \
-    --use_gene_annotation False \
-    --use_repeat_annotation True
+    --use_gene_annotation false \
+    --use_repeat_annotation true
 ```
 
-### Run gene and repeat annotation together
-
-```cli
-oriongeno pipeline \
-    --genome /data/home/GCF.xxx._genomic.fna.gz \
-    --species_name Homo_sapiens \
-    --out /output/home/example.gtf \
-    --batch_size 4 \
-    --model /checkpoints/Mammalia \
-    --use_gene_annotation True \
-    --use_repeat_annotation True
-```
+The default CLI behavior is:
+- `use_gene_annotation=True`
+- `use_repeat_annotation=False`
+- `include_utr=False`
+- `seq_len=512000`
+- `flank_bp=128000`
 
 **Note:** At least one of `--use_gene_annotation` and `--use_repeat_annotation` must be `True`.
 
 ## Input and Output
 
-### Accepted genome input formats
-
-- `.fa`
-- `.fasta`
-- `.fa.gz`
-- `.fasta.gz`
-- `.bz2`
+### Input formats
+- `*.fa` `*.fasta` `*.fa.gz` `*.fasta.gz` `*.bz2`
 
 ### Output files
-
-If you run:
-
-```bash
---out outputs/sample.gtf
-```
-
 you will get:
 
 - `outputs/sample.gene.gtf` when gene annotation is enabled
@@ -138,28 +102,12 @@ you will get:
 
 The gene GTF may include:
 
-- `gene`
-- `transcript`
-- `exon`
-- `intron`
-- `CDS`
-- `start_codon`
-- `stop_codon`
-- `five_prime_utr`
-- `three_prime_utr`
+- `gene` `transcript` `exon` `intron` `CDS` `start_codon` `stop_codon` `five_prime_utr` `three_prime_utr`
 
 The repeat GTF uses `repeat_region` records and may include attributes such as:
-
-- `repeat_id`
-- `repeat_name`
-- `repeat_class`
-- `repeat_family`
-- `repeat_label`
+- `repeat_id` `repeat_name` `repeat_class` `repeat_family` `repeat_label`
 
 ## Arguments
-
-These are the user-facing command-line options exposed by `main.py`.
-
 |         Argument          |                                      Meaning                                       |
 |:-------------------------:|:----------------------------------------------------------------------------------:|
 |        `--genome`         |                                Genome FASTA input.                                 |
@@ -172,15 +120,6 @@ These are the user-facing command-line options exposed by `main.py`.
 |       `--flank_bp`        |                    Extra context added to each side of a tile.                     |
 |      `--batch_size`       |                       Number of sequences processed at once.                       |
 
-## Recommended GPU Settings
-
-|       GPU       | VRAM  | `batch_size`  | `seq_len`  | `flank_bp`  |
-|:---------------:|:-----:|:-------------:|:----------:|:-----------:|
-|   NVIDIA A100   | `80G` |      `8`      |  `512000`  |  `128000`   |
-| NVIDIA RTX 4090 | `24G` |      `2`      |  `512000`  |  `128000`   |
-
-If you run out of memory on another GPU, reduce `batch_size` first.
-
 
 ## Troubleshooting
 Having trouble installing `mamba` or `causal-conv1d`? Check out the [official documentation](https://github.com/state-spaces/mamba.git) for full installation guidance and troubleshooting help.
@@ -190,7 +129,7 @@ If you use this codebase, or otherwise find our work valuable, please cite Orion
 
 ```
 @article{OrionGeno,
-  title={OrionGeno xxxxx},
+  title={Advancing ab initio gene annotation with OrionGeno},
   author={xxx1, xxx2, xxx3, et al},
   journal={xxxx},
   year={2026}

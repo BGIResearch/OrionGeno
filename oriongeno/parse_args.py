@@ -63,28 +63,15 @@ def apply_internal_defaults(args: Namespace):
 
 
 def parse_cmd():
-    """Parse command-line arguments for the OrienGeno entry point."""
+    """Parse command-line arguments for the OrionGeno entry point."""
     main_parser = argparse.ArgumentParser(
-        prog="OrienGeno",
-        description=(
-            "OrienGeno performs gene annotation and repeat annotation from a genome FASTA.\n\n"
-            "Typical usage:\n"
-            "  Gene only:   python main.py --genome genome.fa --species_name Homo_sapiens --out result.gtf\n"
-            "  Repeat only: python main.py --genome genome.fa --species_name Homo_sapiens --out result.gtf --use_gene_annotation False --use_repeat_annotation True\n"
-            "  Both:        python main.py --genome genome.fa --species_name Homo_sapiens --out result.gtf --use_repeat_annotation True\n\n"
-            "The public CLI only exposes the common user-facing options."
-        ),
+        prog="OrionGeno",
+        description="OrionGeno performs gene annotation and repeat annotation from a genome FASTA.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
-    subparser = main_parser.add_subparsers(
-        dest="command",
-        required=True
-    )
-
-    parser = subparser.add_parser(
-        'pipeline'
-    )
+    subparser = main_parser.add_subparsers(dest="command", required=True)
+    parser = subparser.add_parser('pipeline')
     parser.add_argument(
         "--model",
         type=str,
@@ -92,28 +79,15 @@ def parse_cmd():
         default="",
     )
     parser.add_argument(
-        "--model_root",
+        "--strand",
         type=str,
-        help=argparse.SUPPRESS,
-        default="",
-    )
-    parser.add_argument(
-        "--species_table_path",
-        type=str,
-        help=argparse.SUPPRESS,
-        default="",
-    )
-    parser.add_argument(
-        "--species_embedding_path",
-        type=str,
-        help=argparse.SUPPRESS,
-        default="",
+        default="+,-",
     )
     parser.add_argument(
         "--out",
         type=str,
         help="Base output GTF path. Gene output always uses *.gene.gtf and repeat output always uses *.repeat.gtf.",
-        default="oriengeno.gtf",
+        default="oriongeno.gtf",
     )
     parser.add_argument(
         "--use_gene_annotation",

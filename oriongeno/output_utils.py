@@ -261,11 +261,13 @@ def write_filtered_gene_outputs(
     gtf_out,
     id_prefix,
     include_utr=True,
+    quiet_logs=False,
 ):
     """Apply the strict post-filtering rules and write one final GTF."""
-    logging.info(
-        f"Total gene transcripts before final filtering: {len(anno.transcripts)}"
-    )
+    if not quiet_logs:
+        logging.info(
+            f"Total gene transcripts before final filtering: {len(anno.transcripts)}"
+        )
 
     anno_outp_strict = Anno("", "anno")
     out_tx_strict = {}

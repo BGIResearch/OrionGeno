@@ -1,8 +1,3 @@
-"""Inference pipeline orchestration for OrionGeno.
-
-Authors: wangshengfu, caixudong
-"""
-
 import logging
 import os
 import sys
@@ -47,12 +42,29 @@ from .runtime_utils import (
     shard_work,
 )
 from .species_router import (
-    DEFAULT_MODEL_ROOT,
     DEFAULT_SPECIES_EMBEDDING_PATH,
     DEFAULT_SPECIES_TABLE_PATH,
     normalize_species_name,
     resolve_species_runtime_assets,
 )
+
+
+def _quiet_runtime_logs(args):
+    """Return True when the caller requested API-safe quiet runtime logging."""
+    return bool(getattr(args, "quiet_runtime_logs", False))
+
+
+def _emit_task_progress(args, stage, current=None, total=None):
+    """Forward generic progress updates to the optional API callback."""
+    callback = getattr(args, "progress_callback", None)
+    if callback is None:
+        return
+    try:
+        callback(stage=stage, current=current, total=total)
+    except TypeError:
+        callback(stage, current, total)
+    except Exception:
+        pass
 
 
 def setup_runtime(args, output_path):
@@ -119,6 +131,7 @@ def setup_runtime(args, output_path):
         device=device,
         backend=backend,
         work_dir=dist_tmp_dir,
+        quiet=_quiet_runtime_logs(args),
     )
 
 
@@ -240,13 +253,20 @@ def run_annotation_workflow(
                 summary=runtime.is_main and j == 0 and not run_gene_for_strand
             )
             for local_idx, seq_group in enumerate(local_seq_groups):
-                emit_rank_progress(
-                    runtime,
-                    "OrionGeno repeat annotation "
-                    + f"{local_idx + 1}/{len(local_seq_groups)} in strand-independent mode "
-                    + f"(internal '{strand_name}' pass): "
-                    + f"{format_sequence_group_label(seq_group)}",
+                _emit_task_progress(
+                    args,
+                    "repeat_annotation",
+                    local_idx + 1,
+                    len(local_seq_groups),
                 )
+                if not runtime.quiet:
+                    emit_rank_progress(
+                        runtime,
+                        "OrionGeno repeat annotation "
+                        + f"{local_idx + 1}/{len(local_seq_groups)} in strand-independent mode "
+                        + f"(internal '{strand_name}' pass): "
+                        + f"{format_sequence_group_label(seq_group)}",
+                    )
                 repeat_genome_fasta = pred_repeat_gtf.init_fasta(
                     chunk_len=seq_len,
                     min_seq_len=min_seq_len,
@@ -273,12 +293,19 @@ def run_annotation_workflow(
                 summary=runtime.is_main and j == 0
             )
             for local_idx, seq_group in enumerate(local_seq_groups):
-                emit_rank_progress(
-                    runtime,
-                    "OrionGeno gene annotation "
-                    + f"{local_idx + 1}/{len(local_seq_groups)} on strand {strand_name}: "
-                    + f"{format_sequence_group_label(seq_group)}",
+                _emit_task_progress(
+                    args,
+                    "gene_annotation",
+                    local_idx + 1,
+                    len(local_seq_groups),
                 )
+                if not runtime.quiet:
+                    emit_rank_progress(
+                        runtime,
+                        "OrionGeno gene annotation "
+                        + f"{local_idx + 1}/{len(local_seq_groups)} on strand {strand_name}: "
+                        + f"{format_sequence_group_label(seq_group)}",
+                    )
                 gene_genome_fasta = pred_gene_gtf.init_fasta(
                     chunk_len=seq_len,
                     min_seq_len=min_seq_len,
@@ -343,6 +370,7 @@ def run_annotation_workflow(
                     gtf_out,
                     args.id_prefix,
                     include_utr=args.include_utr,
+                    quiet_logs=runtime.quiet,
                 )
             if output_repeat:
                 write_repeat_outputs(
@@ -362,6 +390,7 @@ def run_annotation_workflow(
             gtf_out,
             args.id_prefix,
             include_utr=args.include_utr,
+            quiet_logs=runtime.quiet,
         )
     if output_repeat:
         write_repeat_outputs(
@@ -391,7 +420,7 @@ def log_run_configuration(
     genome_path,
 ):
     """Print one consolidated summary of the active runtime configuration."""
-    if not runtime.is_main:
+    if not runtime.is_main or runtime.quiet:
         return
 
     logging.info("Model interface: OrionGeno unified species-conditioned runtime")
@@ -404,10 +433,6 @@ def log_run_configuration(
         if args.repeat_min_run_length > 1:
             logging.info(
                 f"Repeat minimum positive run length: {args.repeat_min_run_length}"
-            )
-        if args.repeat_max_gap > 0:
-            logging.info(
-                f"Repeat short-gap smoothing: fill non-repeat gaps <= {args.repeat_max_gap} bp."
             )
         logging.info(
             "Repeat annotation is strand-independent. OrionGeno runs one internal "
@@ -428,15 +453,6 @@ def log_run_configuration(
         )
     logging.info(f"Minimum sequence length: {min_seq_len}")
     logging.info(f"Strand: {strand}")
-    if use_spe_embeddings and species_name:
-        logging.info("Species embeddings enabled: True")
-        logging.info(f"Species embedding name: {species_name}")
-    elif use_spe_embeddings and not species_name:
-        logging.info("Species embeddings enabled: True")
-        logging.info(
-            "Species embeddings were requested without species_name; continuing "
-            "without species embeddings."
-        )
     logging.info(f"Genome sequence path: {genome_path}")
     if args.sequence_name_include_regex:
         logging.info(f"Sequence level filter: {args.sequence_level}")
@@ -492,11 +508,11 @@ def run_oriongeno(args):
         sys.exit(1)
 
     model_override_path = getattr(args, "model", "").strip()
-    model_root = (
-        os.path.abspath(args.model_root)
-        if getattr(args, "model_root", "")
-        else DEFAULT_MODEL_ROOT
-    )
+    # model_root = (
+    #     os.path.abspath(args.model_root)
+    #     if getattr(args, "model_root", "")
+    #     else DEFAULT_MODEL_ROOT
+    # )
     species_table_path = (
         os.path.abspath(args.species_table_path)
         if getattr(args, "species_table_path", "")
@@ -510,12 +526,19 @@ def run_oriongeno(args):
 
     try:
         if model_override_path:
-            model_bundle_paths = resolve_model_bundle_paths(model_override_path)
-            model_bundle_paths["species_embedding_path"] = spe_embedding_path
+            # model_bundle_paths = resolve_model_bundle_paths(model_override_path)
+            # model_bundle_paths["species_embedding_path"] = spe_embedding_path
+            model_bundle_paths = resolve_species_runtime_assets(
+                species_name=species_name,
+                model_root=model_override_path,
+                species_table_path=species_table_path,
+                species_embedding_path=spe_embedding_path,
+            )
+            species_name = model_bundle_paths["species_name"]
         else:
             model_bundle_paths = resolve_species_runtime_assets(
                 species_name=species_name,
-                model_root=model_root,
+                model_root=model_override_path,
                 species_table_path=species_table_path,
                 species_embedding_path=spe_embedding_path,
             )
@@ -610,11 +633,11 @@ def run_oriongeno(args):
             sys.exit(1)
         if output_repeat and not output_gene:
             strand = ["+"]
-            if runtime.is_main:
+            if runtime.is_main and not runtime.quiet:
                 logging.info(
                     "Repeat-only mode uses strand '+' only because repeat output is strand-independent."
                 )
-        elif output_repeat and "+" not in strand and runtime.is_main:
+        elif output_repeat and "+" not in strand and runtime.is_main and not runtime.quiet:
             logging.info(
                 "Repeat annotation is strand-independent, so '+' will be used internally once for repeat output."
             )
@@ -627,6 +650,7 @@ def run_oriongeno(args):
         genome_path = os.path.abspath(args.genome)
         check_file_exists(genome_path)
 
+        _emit_task_progress(args, "loading_genome")
         log_run_configuration(
             args=args,
             runtime=runtime,
@@ -657,20 +681,21 @@ def run_oriongeno(args):
                 "ERROR: No FASTA records matched the current sequence filtering settings."
             )
             sys.exit(1)
-        if runtime.is_main:
+        if runtime.is_main and not runtime.quiet:
             logging.info(
                 f"Loaded {kept_records}/{total_records} FASTA records after filtering."
             )
 
         original_genome = genome
         original_genome_seq_dict = build_genome_seq_dict(original_genome)
+        _emit_task_progress(args, "packing_scaffolds")
         inference_genome, packing_info = prepare_inference_genome(
             original_genome,
             scaffold_pack_mode=args.scaffold_pack_mode,
             scaffold_pack_gap_bp=args.scaffold_pack_gap_bp,
             scaffold_pack_target_bp=args.scaffold_pack_target_bp,
         )
-        if runtime.is_main:
+        if runtime.is_main and not runtime.quiet:
             if packing_info.get("enabled"):
                 logging.info(
                     "Scaffold packing enabled: "
@@ -712,6 +737,6 @@ def run_oriongeno(args):
     finally:
         cleanup_runtime(runtime)
 
-    if runtime.is_main:
+    if runtime.is_main and not runtime.quiet:
         duration_minutes = (time.time() - start_time) / 60
         print(f"OrionGeno finished in {duration_minutes:.4f} minutes.")
