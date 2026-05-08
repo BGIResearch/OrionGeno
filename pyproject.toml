@@ -6,23 +6,23 @@ build-backend = "setuptools.build_meta"
 name = "oriongeno"
 version = "1.0.2"
 authors = [{ name = "OrionGeno Group", email = "zhangchao5@genomic.cn" }]
-description = "OrionGeno is an end-to-end model for annotating eukaryotic genomes. You give it a genome FASTA and a species name, and it writes gene annotations, repeat annotations, or both in GTF format."
-readme = { text = "OrionGeno is an end-to-end model for annotating eukaryotic genomes. You give it a genome FASTA and a species name, and it writes gene annotations, repeat annotations, or both in GTF format.", content-type = "text/plain" }
+description = "OrionGeno is an end-to-end model for ab initio eukaryotic gene annotation from genome FASTA to GTF."
+readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.11"
 dependencies = [
     'numpy>=1.26.4',
     'biopython>=1.85',
     'einops>=0.8.1',
     'typing_extensions>=4.15',
-    'torch>=2.7.1',
-    'transformers==4.57.1',
-    'tokenizers==0.22.1',
-    'huggingface_hub==0.36.0',
-    'safetensors==0.7.0',
+    'torch>=2.7.0',
+    'transformers>=4.57,<5',
+    'tokenizers>=0.22,<0.23',
+    'huggingface_hub>=0.34',
+    'safetensors>=0.5',
     'mamba-ssm>=2.2.5',
     'causal-conv1d>=1.5.2',
-    'triton==3.3.1',
+    'triton>=3.3',
 ]
 
 [project.scripts]
@@ -34,9 +34,16 @@ oriongeno = "oriongeno.cli:main"
 "Bug Tracker" = "https://github.com/BGIResearch/OrionGeno/issues"
 "Changelog" = "https://github.com/BGIResearch/OrionGeno/releases"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["oriongeno*", "hmm_layer*", "model_packages*"]
+exclude = ["tests*", "test*", "output*", "outputs*", "checkpoints*"]
+
 [tool.setuptools]
-packages = ["oriongeno"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-oriongeno = ["**/*.pyc", "**/*.py"]
+oriongeno = ["*.pyc"]
+hmm_layer = ["*.pyc"]
+model_packages = ["species_routes.csv", "*.pyc"]
+"model_packages.orion_geno" = ["*.pyc"]
