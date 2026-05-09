@@ -13,13 +13,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 
 INTERNAL_ARG_FLAGS = {
     "--checkpoint",
+    "--genome",
+    "--out",
     "--seq-len",
     "--flank-size",
     "--parallel-factor",
     "--strand",
     "--use-hmm",
     "--upper-only",
-    "--use-species-embedding",
     "--clamsa",
     "--coding-seq",
     "--protein-seq",
@@ -30,6 +31,9 @@ INTERNAL_ARG_FLAGS = {
     "--shard-strategy",
     "--shard-manifest",
     "--show-model-summary",
+    "--checkpoint-root",
+    "--species-table",
+    "--max-fasta-records",
 }
 
 

@@ -45,5 +45,5 @@ include-package-data = true
 [tool.setuptools.package-data]
 oriongeno = ["*.pyc"]
 hmm_layer = ["*.pyc"]
-model_packages = ["species_routes.csv", "*.pyc"]
+model_packages = ["species_routes.csv", "species_embeddings_pca_formatted_numpy_float32.pkl", "*.pyc"]
 "model_packages.orion_geno" = ["*.pyc"]

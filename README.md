@@ -49,36 +49,44 @@ pip install -e .
 
 ## Download Model Weights
 
-Download the inference checkpoints from Hugging Face:
+Download the inference checkpoints from either Hugging Face or ModelScope:
 
-| Model | Hugging Face |
-|:-----:|:-------------|
-| `OrionGeno` | [BGI-Research/OrionGeno](https://huggingface.co/BGI-Research/OrionGeno) |
+| Model | Hugging Face | ModelScope |
+|:-----:|:-------------|:-----------|
+| `OrionGeno` | [BGI-Research/OrionGeno](https://huggingface.co/BGI-Research/OrionGeno) | [BGI-Research/OrionGeno](https://modelscope.cn/models/BGI-Research/OrionGeno/files) |
 
-For example:
+For example, with Hugging Face:
 
 ```bash
 git lfs install
-git clone https://huggingface.co/BGI-Research/OrionGeno /path/to/oriongeno-checkpoints
+git clone https://huggingface.co/BGI-Research/OrionGeno /path/to/oriongeno-weights
 ```
 
-The checkpoint root should contain the routed checkpoint directories directly:
+Or with ModelScope:
+
+```bash
+modelscope download --model BGI-Research/OrionGeno --local_dir /path/to/oriongeno-weights
+```
+
+Both downloads contain a top-level `checkpoints/` directory. The checkpoint
+root passed to OrionGeno can be either the downloaded repository root or the
+`checkpoints/` directory itself:
 
 ```text
-/path/to/oriongeno-checkpoints/
-  checkpoints1/
-  checkpoints2/
-  checkpoints3/
-  checkpoints4/
-  checkpoints5/
-  checkpoints6/
-  checkpoints7/
-  checkpoints8/
+/path/to/oriongeno-weights/
+  checkpoints/
+    checkpoints1/
+    checkpoints2/
+    checkpoints3/
+    checkpoints4/
+    checkpoints5/
+    checkpoints6/
+    checkpoints7/
+    checkpoints8/
 ```
 
-Pass this root directory to OrionGeno. Do not pass one subdirectory such as
-`checkpoints1` manually; `--species_name` resolves the proper internal
-checkpoint automatically.
+Do not pass one subdirectory such as `checkpoints1` manually; `--species_name`
+resolves the proper internal checkpoint automatically.
 
 ## Choose Species
 
@@ -93,7 +101,7 @@ Validate a species name before running inference:
 ```bash
 oriongeno route \
   --species-name Homo_sapiens \
-  --checkpoint-root /path/to/oriongeno-checkpoints
+  --checkpoint-root /path/to/oriongeno-weights
 ```
 
 If you only want to check whether the species exists in the table before the
@@ -103,14 +111,14 @@ weights are downloaded, add `--allow-missing-checkpoint`.
 
 Only three filesystem paths are required:
 
-- checkpoint root downloaded from Hugging Face
+- checkpoint root downloaded from Hugging Face or ModelScope
 - genome FASTA input
 - output GTF path
 
 The species name is selected from `model_packages/species_routes.csv`.
 
 ```bash
-CHECKPOINT_ROOT=/path/to/oriongeno-checkpoints
+CHECKPOINT_ROOT=/path/to/oriongeno-weights
 GENOME_FASTA=/path/to/genome.fna
 OUTPUT_GTF=/path/to/out.gtf
 SPECIES_NAME=Homo_sapiens

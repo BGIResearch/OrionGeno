@@ -17,12 +17,11 @@ venv/
 *.npz
 *.npy
 
-# Model weights are distributed separately through Hugging Face.
+# Model weights are distributed separately through Hugging Face or ModelScope.
 *.bin
 *.pt
 *.pth
 *.safetensors
-model_packages/species_embeddings_pca_formatted_numpy_float32.pkl
 
 /docs/img/*.pdf
 
