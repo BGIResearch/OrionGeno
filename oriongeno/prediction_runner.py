@@ -14,6 +14,7 @@ import numpy as np
 from .cli_config import check_file_exists, env_bool, env_int, env_str, str_to_bool
 from .constants import (
     DEFAULT_FRAGMENTED_RECORD_THRESHOLD,
+    DEFAULT_MAX_CHUNKS_PER_INFERENCE_GROUP,
     DEFAULT_MAX_FASTA_RECORDS,
     DEFAULT_PACK_SPACER_LEN,
     DEFAULT_PACK_TARGET_SIZE,
@@ -46,6 +47,11 @@ PREDICTION_STRANDS = ("+", "-")
 USE_HMM = True
 UPPER_ONLY = True
 GROUP_TARGET_SIZE = env_int("ORIONGENO_SEQUENCE_GROUP_SIZE", SEQUENCE_GROUP_SIZE)
+BATCH_BOTH_STRANDS = env_bool("ORIONGENO_BATCH_BOTH_STRANDS", False)
+MAX_CHUNKS_PER_INFERENCE_GROUP = env_int(
+    "ORIONGENO_MAX_CHUNKS_PER_INFERENCE_GROUP",
+    DEFAULT_MAX_CHUNKS_PER_INFERENCE_GROUP,
+)
 
 
 class PredictionContext:
@@ -102,9 +108,117 @@ def _resolve_checkpoint_path(args):
 
 def _strand_batches(strands):
     strands = tuple(strands)
-    if strands == ("+", "-"):
+    if BATCH_BOTH_STRANDS and strands == ("+", "-"):
         return [strands]
     return [(strand,) for strand in strands]
+
+
+def _as_numpy(array):
+    if hasattr(array, "detach"):
+        return array.detach().cpu().numpy()
+    return np.asarray(array)
+
+
+def _internal_chunk_span(strand_count):
+    if MAX_CHUNKS_PER_INFERENCE_GROUP <= 0:
+        return None
+    return max(1, MAX_CHUNKS_PER_INFERENCE_GROUP // max(1, strand_count))
+
+
+def _predict_internal_chunks(
+    predictor,
+    strand_inputs,
+    context,
+    *,
+    log_prefix,
+    group_number,
+    total_groups,
+    strand_label,
+):
+    max_chunk_count = max(item["x_data"].shape[0] for item in strand_inputs)
+    chunk_span = _internal_chunk_span(len(strand_inputs))
+    if chunk_span is None or chunk_span >= max_chunk_count:
+        chunk_span = max_chunk_count
+    internal_total = max(1, int(np.ceil(max_chunk_count / chunk_span)))
+    if internal_total > 1:
+        logging.info(
+            "%s prediction group %s/%s (%s) split into %s internal chunk windows "
+            "of up to %s chunks per strand.",
+            log_prefix,
+            group_number,
+            total_groups,
+            strand_label,
+            internal_total,
+            chunk_span,
+        )
+
+    for internal_index, start in enumerate(range(0, max_chunk_count, chunk_span), start=1):
+        end = min(start + chunk_span, max_chunk_count)
+        sub_items = []
+        sub_chunks = []
+        for item in strand_inputs:
+            item_chunk_count = item["x_data"].shape[0]
+            if start >= item_chunk_count:
+                continue
+            item_end = min(end, item_chunk_count)
+            sub_items.append((item, start, item_end))
+            sub_chunks.append(item["x_data"][start:item_end])
+        if not sub_chunks:
+            continue
+
+        if len(sub_chunks) == 1:
+            combined_chunks = sub_chunks[0]
+        else:
+            combined_chunks = np.concatenate(sub_chunks, axis=0)
+        if internal_total > 1:
+            logging.info(
+                "%s prediction group %s/%s (%s) internal chunk %s/%s shape=%s",
+                log_prefix,
+                group_number,
+                total_groups,
+                strand_label,
+                internal_index,
+                internal_total,
+                combined_chunks.shape,
+            )
+
+        prediction_outputs = predictor.get_prediction_outputs(
+            combined_chunks,
+            hmm_filter=True,
+            clamsa_inp=None,
+            output_gene=context.output_gene,
+            output_repeat=context.output_repeat,
+        )
+
+        offset = 0
+        for item, item_start, item_end in sub_items:
+            chunk_count = item_end - item_start
+            item_outputs = item.setdefault("prediction_outputs", {})
+            output_slice = slice(offset, offset + chunk_count)
+            if context.output_gene:
+                gene_chunk = _as_numpy(prediction_outputs["gene"][output_slice])
+                gene_output = item_outputs.get("gene")
+                if gene_output is None:
+                    gene_output = np.empty(
+                        (item["x_data"].shape[0],) + gene_chunk.shape[1:],
+                        dtype=gene_chunk.dtype,
+                    )
+                    item_outputs["gene"] = gene_output
+                gene_output[item_start:item_end] = gene_chunk
+            if context.output_repeat:
+                repeat_chunk = _as_numpy(prediction_outputs["repeat"][output_slice])
+                repeat_output = item_outputs.get("repeat")
+                if repeat_output is None:
+                    repeat_output = np.empty(
+                        (item["x_data"].shape[0],) + repeat_chunk.shape[1:],
+                        dtype=repeat_chunk.dtype,
+                    )
+                    item_outputs["repeat"] = repeat_output
+                repeat_output[item_start:item_end] = repeat_chunk
+            offset += chunk_count
+
+        del combined_chunks, prediction_outputs, sub_chunks, sub_items
+        gc.collect()
 
 
 def _predict_genome_records(
@@ -224,33 +338,19 @@ def _predict_genome_records(
 
                 adapted_seqlen = strand_inputs[0]["adapted_seqlen"]
                 predictor.adapt_batch_size(adapted_seqlen)
-                if len(strand_inputs) == 1:
-                    combined_chunks = strand_inputs[0]["x_data"]
-                else:
-                    chunk_counts = [item["x_data"].shape[0] for item in strand_inputs]
-                    combined_chunks = np.concatenate(
-                        [item["x_data"] for item in strand_inputs],
-                        axis=0,
-                    )
-                    offset = 0
-                    for item, chunk_count in zip(strand_inputs, chunk_counts):
-                        item["x_data"] = combined_chunks[offset : offset + chunk_count]
-                        offset += chunk_count
+                _predict_internal_chunks(
+                    predictor,
+                    strand_inputs,
+                    context,
+                    log_prefix=log_prefix,
+                    group_number=group_number,
+                    total_groups=total_groups,
+                    strand_label=strand_label,
+                )
                 del x_data, coords
 
-                prediction_outputs = predictor.get_prediction_outputs(
-                    combined_chunks,
-                    hmm_filter=True,
-                    clamsa_inp=None,
-                    output_gene=context.output_gene,
-                    output_repeat=context.output_repeat,
-                )
-
-                offset = 0
                 for item in strand_inputs:
                     strand = item["strand"]
-                    chunk_count = item["x_data"].shape[0]
-                    output_slice = slice(offset, offset + chunk_count)
                     coords = item["coords"]
                     effective_chunks = _trim_prediction_flanks(
                         item["x_data"],
@@ -259,7 +359,7 @@ def _predict_genome_records(
 
                     if context.output_gene:
                         effective_labels = _trim_prediction_flanks(
-                            prediction_outputs["gene"][output_slice],
+                            item["prediction_outputs"]["gene"],
                             context.flank_size,
                         )
                         annotation, transcript_counter = predictor.create_gtf(
@@ -277,7 +377,7 @@ def _predict_genome_records(
 
                     if context.output_repeat:
                         effective_repeat = _trim_prediction_flanks(
-                            prediction_outputs["repeat"][output_slice],
+                            item["prediction_outputs"]["repeat"],
                             context.flank_size,
                         )
                         repeat_writer.add_predictions(
@@ -288,10 +388,9 @@ def _predict_genome_records(
                         )
                         del effective_repeat
 
-                    offset += chunk_count
                     del effective_chunks
 
-                del combined_chunks, prediction_outputs, strand_inputs, adapted_seqlen
+                del strand_inputs, adapted_seqlen
 
             genome_fasta.one_hot_encoded = None
             gc.collect()

@@ -164,6 +164,26 @@ ORIONGENO_SEQUENCE_GROUP_SIZE=4000000 python main.py ...
 
 The default is `10240000`.
 
+By default, positive and negative strands are processed separately to reduce CPU
+memory peaks. On hosts with enough CPU RAM, set
+`ORIONGENO_BATCH_BOTH_STRANDS=True` to queue both strands from the same sequence
+group together, matching the original behavior. This can reduce scheduling
+overhead and improve throughput, but it substantially increases CPU memory use.
+
+Long chromosomes can still produce hundreds of model chunks even when the
+sequence group target is small. To cap that peak, OrionGeno splits each sequence
+group into internal inference windows before model prediction and HMM decoding:
+
+```bash
+ORIONGENO_MAX_CHUNKS_PER_INFERENCE_GROUP=256 python main.py ...
+```
+
+The default is `256`. When `ORIONGENO_BATCH_BOTH_STRANDS=True`, the value is
+shared across both strands, so the default runs up to about 128 chunks per
+strand in each internal window. Lower the value further, for example `128`, on
+CPU-memory constrained hosts. Set it to `0` only to restore the old unbounded
+per-group behavior.
+
 For GPU memory pressure, reduce `--batch-size`. The prediction runner also sets
 the following unless it is already configured:
 
@@ -193,6 +213,8 @@ PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 | `ORIONGENO_OUTPUT_GENE` | Default gene-output switch. |
 | `ORIONGENO_OUTPUT_REPEAT` | Default repeat-output switch. |
 | `ORIONGENO_SEQUENCE_GROUP_SIZE` | CPU-side prepared-model-base target per sequence group. |
+| `ORIONGENO_BATCH_BOTH_STRANDS` | Batch positive and negative strands from the same sequence group together when truthy. Default `False` lowers CPU memory use; set `True` on high-memory CPU hosts when throughput is preferred. |
+| `ORIONGENO_MAX_CHUNKS_PER_INFERENCE_GROUP` | Maximum model chunks processed per internal inference window. Default `256`; lower it to reduce CPU peak memory. |
 | `ORIONGENO_ASSEMBLY_MODE` | Fragmented assembly mode. |
 | `ORIONGENO_FRAGMENTED_RECORD_THRESHOLD` | Auto-packing record-count threshold. |
 | `ORIONGENO_PACK_SPACER_LEN` | Artificial N spacer length for packed scaffolds. |

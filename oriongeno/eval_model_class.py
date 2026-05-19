@@ -599,7 +599,7 @@ class PredictionGTF:
                             gene_head,
                             dtype=probability_dtype,
                         )
-                        y_gene = probabilities.detach().cpu()
+                        y_gene = probabilities.detach().to(dtype=torch.float16).cpu()
                         gene_predictions.append(y_gene)
                     if output_repeat:
                         repeat_head = self._extract_repeat_head(model_output)
