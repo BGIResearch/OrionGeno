@@ -1,0 +1,13 @@
+# Native extension wheels for the validated OrionGeno inference environment.
+# Install after torch from requirements.min.txt:
+#   python -m pip install --no-deps -r requirements.native-cu126.txt
+#
+# Validated for:
+# - Python 3.10
+# - Linux x86_64
+# - PyTorch 2.7.0+cu126
+# - CUDA 12.x
+# - cxx11abi TRUE
+
+https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.5.2/causal_conv1d-1.5.2+cu12torch2.7cxx11abiTRUE-cp310-cp310-linux_x86_64.whl
+https://github.com/state-spaces/mamba/releases/download/v2.2.5/mamba_ssm-2.2.5+cu12torch2.7cxx11abiTRUE-cp310-cp310-linux_x86_64.whl

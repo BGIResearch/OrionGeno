@@ -16,6 +16,5 @@ dependencies:
       - tokenizers==0.22.2
       - huggingface_hub==0.34.4
       - safetensors==0.5.3
-      - mamba-ssm==2.2.5
-      - causal-conv1d==1.5.2
       - triton==3.3.0
+      - tqdm>=4.66

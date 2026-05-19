@@ -1,4 +1,5 @@
 # Advancing ab initio gene annotation with OrionGeno
+
 <p align="center">
   <strong>OrionGeno takes a genome FASTA and produces gene annotations in GTF format.</strong>
 </p>
@@ -13,14 +14,11 @@
 
 ## What OrionGeno Does
 
-OrionGeno is an end-to-end model for ab initio eukaryotic gene annotation.
-You provide a genome FASTA, an output GTF path, a downloaded checkpoint root,
-and a species name. OrionGeno resolves the proper internal checkpoint from the
-species metadata and writes one filtered gene GTF to the requested output path.
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Stage](https://img.shields.io/badge/Stage-Predicting-0e7490)
+![Outputs](https://img.shields.io/badge/Outputs-Gene%20GTF%20%7C%20Repeat%20GTF%20%7C%20Logs-0a7f5a)
 
-The public interface treats OrionGeno as one species-conditioned model. Users
-do not choose `checkpoints1` to `checkpoints8` manually; checkpoint routing is
-handled automatically from `model_packages/species_routes.csv`.
+OrionGeno is a deep learning-based *ab initio* model for eukaryotic gene annotation. It takes FASTA-formatted genomic sequences as input and generates GTF annotations for gene structures, including exons, introns, UTRs, and optional repeat regions. Powered by a phylogeny-aware architecture, it achieves state-of-the-art accuracy across diverse lineages, including Vertebrates, Invertebrates, Viridiplantae, and Fungi.
 
 ## Benchmark
 
@@ -38,21 +36,26 @@ handled automatically from `model_packages/species_routes.csv`.
 
 #### Create and Install
 
+Clone the repository first:
+
 ```bash
 git clone https://github.com/BGIResearch/OrionGeno.git
 cd OrionGeno
-
-conda env create -f environment.min.yml
-conda activate oriongeno
-pip install -e .
 ```
+
+Then follow the validated installation path in
+[docs/oriongeno-installation-success-notes.md](docs/oriongeno-installation-success-notes.md).
+That guide keeps package caches, temporary files, native extension builds, and
+downloaded wheels inside the repository directory, and documents the tested
+Python 3.10, PyTorch 2.7.0, CUDA 12.x, `mamba-ssm`, and `causal-conv1d`
+installation path.
 
 ## Download Model Weights
 
-Download the inference checkpoints from either Hugging Face or ModelScope:
+Download the inference checkpoints from either Hugging Face or ModelScope via the links below:
 
-| Model | Hugging Face | ModelScope |
-|:-----:|:-------------|:-----------|
+| Model       | Hugging Face                                                            | ModelScope                                                                          |
+|:-----------:|:----------------------------------------------------------------------- |:----------------------------------------------------------------------------------- |
 | `OrionGeno` | [BGI-Research/OrionGeno](https://huggingface.co/BGI-Research/OrionGeno) | [BGI-Research/OrionGeno](https://modelscope.cn/models/BGI-Research/OrionGeno/files) |
 
 For example, with Hugging Face:
@@ -68,153 +71,94 @@ Or with ModelScope:
 modelscope download --model BGI-Research/OrionGeno --local_dir /path/to/oriongeno-weights
 ```
 
-Both downloads contain a top-level `checkpoints/` directory. The checkpoint
-root passed to OrionGeno can be either the downloaded repository root or the
-`checkpoints/` directory itself:
+To improve gene structure prediction accuracy across diverse species, OrionGeno provides lineage-specific checkpoint directories for groups such as mammals, birds, fish, other vertebrates, arthropods, other invertebrates, plants, and fungi. Download the checkpoint directory that matches your target lineage and pass that exact directory with `--checkpoint`.
+
+For example:
 
 ```text
-/path/to/oriongeno-weights/
-  checkpoints/
-    checkpoints1/
-    checkpoints2/
-    checkpoints3/
-    checkpoints4/
-    checkpoints5/
-    checkpoints6/
-    checkpoints7/
-    checkpoints8/
+/path/to/oriongeno-weights/oriongeno_mammals/
 ```
-
-Do not pass one subdirectory such as `checkpoints1` manually; `--species_name`
-resolves the proper internal checkpoint automatically.
-
-## Choose Species
-
-Choose `--species-name` from `model_packages/species_routes.csv`. The command
-accepts values from the `ScientificName`, `Species`, `Subspecies`, or `TaxID`
-columns. If your exact species is not listed, choose the closest related
-species already provided in the table. This species value is what determines
-which internal checkpoint is used.
-
-Validate a species name before running inference:
-
-```bash
-oriongeno route \
-  --species-name Homo_sapiens \
-  --checkpoint-root /path/to/oriongeno-weights
-```
-
-If you only want to check whether the species exists in the table before the
-weights are downloaded, add `--allow-missing-checkpoint`.
 
 ## Quick Start
 
-Only three filesystem paths are required:
+### Inputs
 
-- checkpoint root downloaded from Hugging Face or ModelScope
+Three filesystem paths are required:
+
+- checkpoint directory downloaded from Hugging Face or ModelScope
 - genome FASTA input
 - output GTF path
 
-The species name is selected from `model_packages/species_routes.csv`.
+Specifying `--species-name` is optional. It is used only for species conditioning inside the selected checkpoint; it does not select or validate a checkpoint directory.
+
+### Execution
+
+Run gene prediction on one GPU:
 
 ```bash
-CHECKPOINT_ROOT=/path/to/oriongeno-weights
-GENOME_FASTA=/path/to/genome.fna
-OUTPUT_GTF=/path/to/out.gtf
-SPECIES_NAME=Homo_sapiens
-
-oriongeno pipeline \
-  --checkpoint-root "$CHECKPOINT_ROOT" \
-  --genome "$GENOME_FASTA" \
-  --out "$OUTPUT_GTF" \
-  --species_name "$SPECIES_NAME" \
-  --batch_size 2
-```
-
-The gene annotation is written exactly to the path passed by `--out`:
-
-```text
-/path/to/out.gtf
-```
-
-The same interface also accepts the explicit long option names:
-
-```bash
-oriongeno pipeline \
-  --checkpoint-root "$CHECKPOINT_ROOT" \
-  --genome "$GENOME_FASTA" \
-  --output "$OUTPUT_GTF" \
-  --species-name "$SPECIES_NAME" \
-  --batch-size 2
-```
-
-To write repeat regions together with gene annotations, explicitly enable
-repeat output:
-
-```bash
-oriongeno pipeline \
-  --checkpoint-root "$CHECKPOINT_ROOT" \
-  --genome "$GENOME_FASTA" \
-  --out "$OUTPUT_GTF" \
-  --species_name "$SPECIES_NAME" \
-  --batch_size 2 \
+python main.py \
+  --genome /path/to/genome.fna \
+  --output /path/to/output/oriongeno.gtf \
+  --checkpoint /path/to/oriongeno-weights/oriongeno_mammals \
+  --length 512000 \
+  --flank 64000 \
+  --batch-size 8 \
   --output-gene True \
-  --output-repeat True
+  --output-repeat False \
+  --species-name Homo_sapiens
 ```
 
-This writes:
-
-```text
-/path/to/out.gtf
-/path/to/out.repeat.gtf
-```
-
-### Multi-GPU
+Run gene prediction on multiple GPUs:
 
 ```bash
-oriongeno multi \
-  --checkpoint-root "$CHECKPOINT_ROOT" \
-  --species_name "$SPECIES_NAME" \
-  --genome "$GENOME_FASTA" \
-  --out "$OUTPUT_GTF" \
-  --devices 0,1 \
-  --batch_size 2
+python main.py multi \
+  --genome /path/to/genome.fna \
+  --output /path/to/output/oriongeno.gtf \
+  --checkpoint /path/to/oriongeno-weights/oriongeno_mammals \
+  --devices 0,1,2,3 \
+  --length 512000 \
+  --flank 64000 \
+  --batch-size 8 \
+  --output-gene True \
+  --output-repeat False \
+  --species-name Homo_sapiens
 ```
 
-`oriongeno multi` splits FASTA records into shards, runs one shard per available
-GPU process, merges the shard GTF files, and writes the final gene GTF exactly
-to `--out`.
+Run without species conditioning:
 
-### Recommended Batch Sizes
+```bash
+python main.py \
+  --genome /path/to/genome.fna \
+  --output /path/to/output/oriongeno.gtf \
+  --checkpoint /path/to/oriongeno-weights/oriongeno_mammals \
+  --length 512000 \
+  --flank 64000 \
+  --batch-size 8 \
+  --output-gene True \
+  --output-repeat False
+```
 
-Use these as starting values for `--batch-size`:
+Recommended batch sizes:
 
-| GPU | Recommended batch size |
-|:----|:-----------------------|
-| RTX 4090 | `2` |
-| A40 | `4` |
-| A100 | `8` |
+| GPU      | Recommended batch size |
+|:-------- |:---------------------- |
+| RTX 4090 | `4`                    |
+| A40      | `8`                    |
+| A100     | `16`                   |
 
 If CUDA memory is insufficient, lower `--batch-size`.
 
-## Input and Output
+### Outputs
 
-### Input formats
+OrionGeno generates annotations for genes and optional repeats. At least one of `--output-gene` or `--output-repeat` must be set to `True`.
 
-- `*.fa`
-- `*.fasta`
-- `*.fna`
-- gzip-compressed FASTA such as `*.fa.gz`, `*.fasta.gz`, and `*.fna.gz`
-
-### Output
-
-For the standard gene-annotation workflow, OrionGeno writes one filtered GTF:
+Gene annotations are written directly to the file path specified by `--output` when `--output-gene True`:
 
 ```text
-/path/to/out.gtf
+/path/to/output/oriongeno.gtf
 ```
 
-The GTF may include:
+The gene GTF may include:
 
 - `gene`
 - `transcript`
@@ -226,55 +170,102 @@ The GTF may include:
 - `five_prime_utr`
 - `three_prime_utr`
 
-If repeat output is enabled with `--output-repeat True`, repeat regions are
-written to the same basename with `.repeat.gtf`.
+Repeat annotations are generated beside the gene annotation when `--output-repeat True`. If `--output` is `/path/to/output/oriongeno.gtf`, the repeat output is:
+
+```text
+/path/to/output/oriongeno.repeat.gtf
+```
 
 ## Arguments
 
-| Argument | Default | Meaning |
-|:---------|:--------|:--------|
-| `--checkpoint-root`, `--model` | `./checkpoints` or `ORIONGENO_CHECKPOINT_ROOT` | Root directory containing `checkpoints1` through `checkpoints8`; the species name selects the internal checkpoint automatically. |
-| `--species-table` | `model_packages/species_routes.csv` | Species-to-checkpoint routing table. |
-| `--species_name`, `--species-name` | required | Species name or TaxID from the route table, for example `Homo_sapiens` or `9606`. |
-| `--genome` | required | Genome FASTA input path. |
-| `--out`, `--output` | required for normal use | Gene GTF output path. |
-| `--batch_size`, `--batch-size` | `8` | Number of sequence windows processed at once. Use the GPU recommendations above. |
-| `--length` | `512000` | Output window length in bases. |
-| `--flank` | `128000` | Context bases added to each side of every output window. |
-| `--output-gene` | `True` | Write gene annotations. |
-| `--output-repeat` | `False` | Optional repeat-region output; the standard public workflow leaves this off. |
+| Argument                | Default                            | Meaning                                                                                                                            |
+|:----------------------- |:---------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------- |
+| `--genome`              | `ORIONGENO_GENOME` or required     | Genome FASTA input path.                                                                                                           |
+| `--output`              | `ORIONGENO_OUT` or required        | Gene GTF output path. Repeat output uses the same basename with `.repeat` inserted before the extension.                           |
+| `--checkpoint`          | `ORIONGENO_CHECKPOINT` or required | OrionGeno checkpoint directory to use for inference.                                                                               |
+| `--length`              | `512000`                           | Output window length in bases.                                                                                                     |
+| `--flank`               | `0`                                | Context bases added to each side of every output window. With the default `0`, OrionGeno uses boundary re-prediction where needed. |
+| `--batch-size`          | `8`                                | Number of sequence windows processed at once. Use the GPU recommendations above.                                                   |
+| `--hmm-parallel-factor` | `0`                                | Override the HMM chunk-parallel factor. `0` chooses it automatically.                                                              |
+| `--profile-hmm`         | `False`                            | Print per-batch HMM timing breakdowns.                                                                                             |
+| `--output-gene`         | `True`                             | Write gene annotations.                                                                                                            |
+| `--output-repeat`       | `False`                            | Optional repeat-region output.                                                                                                     |
+| `--species-name`        | empty                              | Optional species name used for species conditioning only. It does not select a checkpoint.                                         |
 
 Multi-GPU mode also accepts:
 
-| Argument | Default | Meaning |
-|:---------|:--------|:--------|
-| `--devices` | `CUDA_VISIBLE_DEVICES` or `0` | Comma-separated GPU IDs, for example `0,1`. |
-| `--num-shards` | number of devices | Total number of FASTA shards. |
-| `--shard-dir` | `<output>.shards` | Temporary per-shard output directory. |
-| `--keep-shards` | off | Keep temporary shard files after a successful merge. |
+| Argument          | Default                                                    | Meaning                                                                                                    |
+|:----------------- |:---------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------- |
+| `--devices`       | `ORIONGENO_DEVICES`, then `CUDA_VISIBLE_DEVICES`, then `0` | Comma-separated GPU IDs, for example `0,1,2,3`.                                                            |
+| `--work-dir`      | `<output basename>.records`                                | Temporary directory for per-GPU FASTA, GTF, logs, and staged merged outputs.                               |
+| `--keep-work-dir` | off                                                        | Keep the temporary work directory after a successful run. Failed runs keep it automatically for debugging. |
+
+## Acceleration and Memory Optimization
+
+### Fragmented Assemblies and CPU Memory
+
+For highly fragmented assemblies, running every short scaffold as an independent
+inference record would create heavy scheduling overhead. In `auto` mode,
+OrionGeno can pack short scaffolds into pseudo-contigs and then remap predictions
+back to the original FASTA records after inference. This improves throughput on
+draft assemblies with many scaffolds.
+
+CPU memory peaks are mainly controlled by how much sequence is prepared for a
+prediction group at one time. To lower CPU memory usage, reduce the sequence
+group target:
+
+```bash
+ORIONGENO_SEQUENCE_GROUP_SIZE=4000000 python main.py ...
+```
+
+If a fragmented assembly still creates very large packed records, reduce the
+packed pseudo-contig target size as well:
+
+```bash
+ORIONGENO_PACK_TARGET_SIZE=10000000 python main.py ...
+```
+
+Smaller values reduce memory peaks but may increase the number of groups and
+slightly reduce throughput.
+
+### GPU Memory
+
+For GPU memory pressure, reduce `--batch-size`:
+
+```bash
+python main.py ... --batch-size 2
+```
+
+The prediction runner also sets the following PyTorch allocator option unless it
+is already configured:
+
+```text
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+```
 
 ## Troubleshooting
 
-If `mamba-ssm` or `causal-conv1d` fails to install, first confirm that the
-CUDA runtime, PyTorch build, and NVIDIA driver are compatible. The
-`environment.min.yml` file pins the tested Python 3.10 runtime set used for
-inference.
+If `mamba-ssm` or `causal-conv1d` fails to install, follow the validated wheel-based path in [docs/oriongeno-installation-success-notes.md](docs/oriongeno-installation-success-notes.md). Also confirm that the CUDA runtime, PyTorch build, and NVIDIA driver are compatible.
 
-If species routing fails, check that `--species-name` is present in
-`model_packages/species_routes.csv` and that `--checkpoint-root` points to the
-directory containing `checkpoints1` through `checkpoints8`.
+If prediction fails before inference starts, check that `--genome`, `--checkpoint`, and `--output` are set correctly, and that the checkpoint path points to the exact lineage-specific checkpoint directory you want to use.
+
+## License
+
+OrionGeno is distributed under the **OrionGeno Non-Commercial License (Academic & Non-Commercial Use Only)**.
+The code and model weights in this repository are personal/academic research achievements.
+To prevent unauthorized commercial exploitation, this project is released under a non-commercial license.
+Commercial use requires a separate license.
+
+1. **Academic & Non-Commercial Use**: You are free to use, modify, and distribute the software **strictly** for non-commercial, academic, and scientific research purposes, in compliance with this license.
+
+2. **Commercial Use**: Any commercial utilization, including but not limited to selling the software, integrating it into commercial platforms, using it for enterprise internal production, or providing paid cloud services, is **strictly prohibited** without prior written permission and a separate commercial license from BGI-Research.
+
+*For commercial licensing inquiries and formal cooperation, please [contact the development team](mailto:yinpeng@genomics.cn).*
 
 ## Citation
 
 If you use this codebase, or otherwise find our work valuable, please cite OrionGeno:
 
-```bibtex
-@article{OrionGeno,
-  title={Advancing ab initio gene annotation with OrionGeno},
-  author={xxx1, xxx2, xxx3, et al},
-  journal={xxxx},
-  year={2026}
-}
-```
+Lin Liu, Xudong Cai, Shengfu Wang, Yuan Deng, Yiwen Wu, Youliang Pan, Jieyu Wang, Chao Zhang, Haopeng Xia, Nongzhang Tan, Kui Su, Yang Liu, Xuping Zhou, Longqi Liu, Tong Wei, Yong Zhang, Qiye Li, Yuxiang Li, Peng Yin, Xun Xu. Advancing ab initio genome annotation with OrionGeno. Preprint at bioRxiv https://doi.org/10.64898/2026.04.26.720859 (2026).
 
-Please [Contact Us](mailto:yinpeng@genomics.cn?subject=Regarding%20OrionGeno%20Feedback) if you have any questions.
+If you have any questions, please contact: yinpeng@genomics.cn

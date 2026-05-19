@@ -1,0 +1,21 @@
+# Minimal runtime dependencies inferred from the validated inference environment.
+# Validated runtime highlights:
+# - Python 3.10.18
+# - torch 2.7.0+cu126
+# - Linux + NVIDIA GPU
+# - Install native Mamba extension wheels separately with:
+#   python -m pip install --no-deps -r requirements.native-cu126.txt
+
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+numpy==2.2.6
+biopython==1.85
+einops==0.8.1
+typing_extensions>=4.12
+torch==2.7.0+cu126
+transformers==4.57.3
+tokenizers==0.22.2
+huggingface_hub==0.34.4
+safetensors==0.5.3
+triton==3.3.0
+tqdm>=4.66

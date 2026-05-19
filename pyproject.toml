@@ -36,14 +36,11 @@ oriongeno = "oriongeno.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["oriongeno*", "hmm_layer*", "model_packages*"]
+include = ["oriongeno*"]
 exclude = ["tests*", "test*", "output*", "outputs*", "checkpoints*"]
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.package-data]
-oriongeno = ["*.pyc"]
-hmm_layer = ["*.pyc"]
-model_packages = ["species_routes.csv", "species_embeddings_pca_formatted_numpy_float32.pkl", "*.pyc"]
-"model_packages.orion_geno" = ["*.pyc"]
+"oriongeno.model_packages" = ["species_embeddings_pca_formatted_numpy_float32.pkl"]
