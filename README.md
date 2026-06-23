@@ -5,6 +5,15 @@
 </p>
 
 <p align="center">
+  <a href="https://db.cngb.org/genomics/orion_geno"><img alt="Online API" src="https://img.shields.io/badge/Online%20API-CNGBdb-0ea5e9?style=flat-square&logo=fastapi&logoColor=white"></a>
+  <a href="https://huggingface.co/BGI-Research/OrionGeno"><img alt="Hugging Face model weights" src="https://img.shields.io/badge/Model%20Weights-Hugging%20Face-ffcc4d?style=flat-square&logo=huggingface&logoColor=black"></a>
+  <a href="https://modelscope.cn/models/BGI-Research/OrionGeno/files"><img alt="ModelScope model weights" src="https://img.shields.io/badge/ModelScope-Weights-6246ea?style=flat-square"></a>
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
+  <img alt="Outputs" src="https://img.shields.io/badge/Outputs-Gene%20GTF%20%7C%20Repeat%20GTF-0a7f5a?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/License-Non--Commercial-b45309?style=flat-square">
+</p>
+
+<p align="center">
   <img src="docs/img/Fig2.png" alt="Protein benchmark summary" width="980">
 </p>
 
@@ -14,11 +23,11 @@
 
 ## What OrionGeno Does
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
-![Stage](https://img.shields.io/badge/Stage-Predicting-0e7490)
-![Outputs](https://img.shields.io/badge/Outputs-Gene%20GTF%20%7C%20Repeat%20GTF%20%7C%20Logs-0a7f5a)
-
 OrionGeno is a deep learning-based *ab initio* model for eukaryotic gene annotation. It takes FASTA-formatted genomic sequences as input and generates GTF annotations for gene structures, including exons, introns, UTRs, and optional repeat regions. Powered by a phylogeny-aware architecture, it achieves state-of-the-art accuracy across diverse lineages, including Vertebrates, Invertebrates, Viridiplantae, and Fungi.
+
+## Online API
+
+An online OrionGeno API is available at [https://db.cngb.org/genomics/orion_geno](https://db.cngb.org/genomics/orion_geno). We welcome researchers to test the service and share feedback. The API will be updated continuously as additional curated species annotations become available.
 
 ## Benchmark
 
