@@ -15,6 +15,40 @@ def _profile_hmm_enabled():
     }
 
 
+def _cpu_viterbi_enabled():
+    # Default ON: the native-CPU Viterbi is the production path. Force the GPU
+    # path with ORIONGENO_HMM_CPU_VITERBI in {0,false,no,off}.
+    return os.environ.get("ORIONGENO_HMM_CPU_VITERBI", "1").lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+_CPU_VITERBI_AVAILABLE = None
+
+
+def _cpu_viterbi_available():
+    """True if the numba CPU decoder can be imported; cached, warns once."""
+    global _CPU_VITERBI_AVAILABLE
+    if _CPU_VITERBI_AVAILABLE is None:
+        try:
+            from .viterbi_cpu import viterbi_decode_cpu  # noqa: F401
+
+            _CPU_VITERBI_AVAILABLE = True
+        except Exception as exc:  # numba/llvmlite missing or broken
+            _CPU_VITERBI_AVAILABLE = False
+            import warnings
+
+            warnings.warn(
+                "numba CPU Viterbi unavailable (%s); falling back to the GPU "
+                "Viterbi path. Install numba to enable the faster CPU decoder."
+                % exc
+            )
+    return _CPU_VITERBI_AVAILABLE
+
+
 def _sync_for_timing(tensor):
     if torch.cuda.is_available() and torch.is_tensor(tensor) and tensor.is_cuda:
         torch.cuda.synchronize(tensor.device)
@@ -555,6 +589,44 @@ def viterbi(
         profile_start, emission_probs, profile_hmm
     )
     num_model, b, seq_len, q = emission_probs.shape
+
+    # Native-CPU full-sequence Viterbi (default; disable with
+    # ORIONGENO_HMM_CPU_VITERBI=0). Compiles the recurrence to machine code,
+    # removing the per-step CUDA kernel-launch overhead that dominates the GPU
+    # path on the tiny 20-state tensors. Only the homogeneous single-model case
+    # is handled; everything else -- and any environment without numba -- falls
+    # through to the GPU path below. parallel_factor is irrelevant here (the
+    # whole sequence is decoded in one pass).
+    if (
+        _cpu_viterbi_enabled()
+        and num_model == 1
+        and non_homogeneous_mask_func is None
+        and not return_variables
+        and _cpu_viterbi_available()
+    ):
+        from .viterbi_cpu import viterbi_decode_cpu
+
+        cpu_init = hmm_cell.init_dist.permute(1, 0, 2).to(
+            device=emission_probs.device, dtype=emission_probs.dtype
+        )
+        cpu_A = hmm_cell.log_A_dense.to(
+            device=emission_probs.device, dtype=emission_probs.dtype
+        )
+        profile_start = _profile_mark(emission_probs, profile_hmm)
+        viterbi_paths = viterbi_decode_cpu(emission_probs, cpu_A, cpu_init)
+        profile_times["local_dp_cpu"] = _profile_elapsed(
+            profile_start, viterbi_paths, profile_hmm
+        )
+        if profile_hmm:
+            total = _profile_elapsed(profile_total_start, viterbi_paths, profile_hmm)
+            detail = " ".join(
+                f"{name}={duration:.3f}s" for name, duration in profile_times.items()
+            )
+            print(
+                "HMM profile (CPU): "
+                f"batch={b} seq_len={seq_len} states={q} {detail} total={total:.3f}s"
+            )
+        return viterbi_paths
 
     assert (
         seq_len % parallel_factor == 0

@@ -18,3 +18,5 @@ dependencies:
       - safetensors==0.5.3
       - triton==3.3.0
       - tqdm>=4.66
+      - llvmlite==0.47.0
+      - numba==0.65.1

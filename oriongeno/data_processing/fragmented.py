@@ -104,7 +104,7 @@ class FragmentedAssemblyMapper:
                 "recheck_sequences": [],
             }
 
-        from ..genome_anno import Transcript
+        from ..genome_annotation import Transcript
 
         remapped = 0
         dropped = 0
@@ -235,10 +235,8 @@ def prepare_inference_genome(
     if threshold <= 0:
         threshold = int(seq_len)
     spacer_len = int(pack_spacer_len or 0)
-    if spacer_len <= 0:
-        spacer_len = max(10000, int(flank_size))
-    else:
-        spacer_len = max(spacer_len, int(flank_size))
+    if spacer_len < 0:
+        raise ValueError("pack_spacer_len must be non-negative.")
     target_size = int(pack_target_size or 0)
     if target_size <= 0:
         target_size = max(int(seq_len), 1)

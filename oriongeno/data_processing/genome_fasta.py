@@ -111,7 +111,7 @@ class GenomeSequences:
                 table[ord('C'), :] = [0, 1, 0, 0, 0]
                 table[ord('G'), :] = [0, 0, 1, 0, 0]
                 table[ord('T'), :] = [0, 0, 0, 1, 0]
-            # A byte lookup table is faster than per-character Python loops.
+            # A byte lookup table is faster than per-character loops.
             int_seq = np.frombuffer(sequence.encode("ascii"), dtype=np.uint8)
             self.one_hot_encoded[s] = table[int_seq]
 
@@ -151,7 +151,8 @@ class GenomeSequences:
         """Get flattened chunks of a specific sequence by name.
 
         Arguments:
-            sequence_name (str): Name of the sequence to extract chunks from.
+            sequence_names (list of str, optional): Names of sequences to extract chunks from.
+                Defaults to all loaded sequences.
             strand (char): Strand direction ('+' for forward, '-' for reverse).
             flank_size (int): Bases kept as left/right context inside each model window.
 
@@ -223,12 +224,13 @@ class GenomeSequences:
             for i in range(num_chunks):
                 core_start = i * core_chunksize
                 core_end = core_start + core_chunksize
+                valid_core_end = min(core_end, len(sequence))
                 window_start = core_start - flank_size
                 window_end = core_end + flank_size
                 chunks_one_hot.append(slice_with_padding(sequence, window_start, window_end))
                 if coords:
                     chunk_coords.append(
-                        [seq_name, strand, core_start + 1, core_end]
+                        [seq_name, strand, core_start + 1, valid_core_end]
                     )
 
         chunks_one_hot = np.stack(chunks_one_hot, axis=0)

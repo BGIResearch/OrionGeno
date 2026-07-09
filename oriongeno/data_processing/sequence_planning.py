@@ -6,11 +6,19 @@ import logging
 import math
 import sys
 
-from ..constants import DEFAULT_PARALLEL_FACTOR, SEQUENCE_GROUP_SIZE
+from ..constants import (
+    DEFAULT_PARALLEL_FACTOR,
+    DEFAULT_SEQUENCE_LENGTH,
+    SEQUENCE_GROUP_SIZE,
+)
 
 
 def compute_parallel_factor(model_seq_len, core_seq_len=None):
-    """Return an HMM factor that keeps model windows on 51200-base multiples."""
+    """Return the largest HMM parallel factor (<= DEFAULT_PARALLEL_FACTOR) that divides
+    model_seq_len and for which core_seq_len is divisible by 512 * factor.
+
+    Falls back to the largest factor dividing model_seq_len when no such factor exists.
+    """
     core_seq_len = int(core_seq_len if core_seq_len is not None else model_seq_len)
     model_seq_len = int(model_seq_len)
     preferred = min(DEFAULT_PARALLEL_FACTOR, model_seq_len)
@@ -68,7 +76,7 @@ def check_flank_size(flank_size, seq_len):
 
 def adapted_core_chunk_size(
     max_seq_len,
-    chunk_size=512000,
+    chunk_size=DEFAULT_SEQUENCE_LENGTH,
     parallel_factor=1,
     *,
     upper_only=True,
@@ -106,7 +114,7 @@ def group_sequences(
     seq_names,
     seq_lens,
     target_size=SEQUENCE_GROUP_SIZE,
-    chunk_size=512000,
+    chunk_size=DEFAULT_SEQUENCE_LENGTH,
     parallel_factor=1,
     *,
     upper_only=True,

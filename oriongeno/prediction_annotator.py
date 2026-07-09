@@ -1,7 +1,8 @@
-"""Prediction and GTF generation utilities for OrionGeno."""
+"""Prediction and annotation generation utilities for OrionGeno."""
 
 import gc
 import json
+import logging
 import os
 import pickle
 import time
@@ -10,11 +11,13 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from .constants import DEFAULT_SEQUENCE_LENGTH
 from .data_processing.genome_fasta import GenomeSequences
-from .genome_anno import Anno
+from .genome_annotation import Anno
 
 GENE_LABEL_COUNT = 20
 REPEAT_LABEL_COUNT = 2
+BOUNDARY_REPREDICTION_LENGTH_FACTOR = 2
 MODEL_INFERENCE_DTYPE = torch.bfloat16
 HMM_INFERENCE_DTYPE = torch.float32
 INFERENCE_DTYPE = MODEL_INFERENCE_DTYPE
@@ -35,6 +38,16 @@ def _env_int(name, default):
 
 CUDA_CACHE_CLEAR_INTERVAL = max(0, _env_int("ORIONGENO_CUDA_CACHE_CLEAR_INTERVAL", 0))
 
+# HMM Viterbi decode batch size, decoupled from the model-forward batch size.
+# The forward batch is constrained by transformer activation memory, but the
+# HMM decode only consumes the already-computed gene probabilities plus the
+# nucleotides; its Viterbi tensors are far lighter, so many more chunks can be
+# decoded per viterbi() call. Larger decode batches give the CPU decoder more
+# batch-level work and amortize per-step CUDA kernel-launch overhead on the GPU
+# fallback path.
+# 0 = fall back to the model-forward batch size (legacy behavior).
+HMM_DECODE_BATCH_SIZE = max(0, _env_int("ORIONGENO_HMM_DECODE_BATCH", 0))
+
 GENE_20_TO_FEATURE = np.array(
     [
         0,  # IR
@@ -52,9 +65,13 @@ GENE_20_TO_FEATURE = np.array(
     ],
     dtype=np.int64,
 )
+HMM_PREFILTER_WINDOW = 200
+HMM_PREFILTER_CDS_THRESHOLD = 0.8
+CDS_LABEL_INDICES = np.flatnonzero(GENE_20_TO_FEATURE == 2)
 
-class PredictionGTF:
-    """Run OrionGeno inference and convert predictions into GTF records.
+
+class PredictionAnnotator:
+    """Run OrionGeno inference and convert predictions into annotation records.
 
     Attributes:
         model_path (str): Path to the pre-trained model.
@@ -67,12 +84,10 @@ class PredictionGTF:
     def __init__(
         self,
         model_path="",
-        seq_len=512000,
+        seq_len=DEFAULT_SEQUENCE_LENGTH,
         batch_size=200,
         hmm=False,
         temp_dir="",
-        num_hmm=1,
-        hmm_factor=1,
         annot_path="",
         genome_path="",
         genome=None,
@@ -80,7 +95,7 @@ class PredictionGTF:
         species_name="",
         strand="+",
         parallel_factor=1,
-        oracle=False,
+        hmm_decode_batch=0,
     ):
         """Configure the prediction runner.
 
@@ -97,8 +112,6 @@ class PredictionGTF:
             strand (str): Strand to process, either "+" or "-".
             parallel_factor (int): Chunk-parallel factor used by Viterbi.
         """
-        if num_hmm != 1:
-            raise ValueError("The current 20-label gene HMM supports num_hmm=1 only.")
         self.model_path = model_path
         self.seq_len = seq_len
         self.batch_size = batch_size
@@ -114,13 +127,13 @@ class PredictionGTF:
         self.strand = strand
         self.model = None
         self.fasta_seq_lens = {}
-        self.num_hmm = num_hmm
-        self.hmm_factor = hmm_factor
         if temp_dir and not os.path.exists(temp_dir):
             os.makedirs(temp_dir, exist_ok=True)
         self.temp_dir = temp_dir
         self.sequence_predictions = None
         self.parallel_factor = parallel_factor
+        # Explicit constructor arg wins; otherwise fall back to the env override.
+        self.hmm_decode_batch = int(hmm_decode_batch) or HMM_DECODE_BATCH_SIZE
         self.sequence_model = None
         self.gene_label_count = GENE_LABEL_COUNT
         self.repeat_label_count = REPEAT_LABEL_COUNT
@@ -129,8 +142,8 @@ class PredictionGTF:
         self.cuda_cache_clear_interval = CUDA_CACHE_CLEAR_INTERVAL
         self._cuda_cache_release_calls = 0
 
-    def reduce_label(self, arr, num_hmm=1):
-        """Reduce 20-label gene states to GTF feature classes.
+    def reduce_label(self, arr):
+        """Reduce 20-label gene states to gene feature classes.
 
         Args:
             arr (np.ndarray): 20-label gene state ids.
@@ -138,8 +151,6 @@ class PredictionGTF:
         Returns:
             np.ndarray: Feature ids for intergenic, intron, CDS, 5UTR, and 3UTR.
         """
-        if num_hmm != 1:
-            raise ValueError("The current 20-label reducer supports num_hmm=1 only.")
         arr = np.asarray(arr, dtype=np.int64)
         if arr.size == 0:
             return arr
@@ -152,6 +163,27 @@ class PredictionGTF:
                 f"expected 20-label ids in [0, {GENE_LABEL_COUNT - 1}]."
             )
         return GENE_20_TO_FEATURE[arr]
+
+    def _chunk_has_cds_signal(self, chunk_probs):
+        """Return True when a chunk has enough CDS probability to need HMM decoding."""
+        chunk_probs = np.asarray(chunk_probs)
+        if chunk_probs.ndim != 2 or chunk_probs.shape[-1] != GENE_LABEL_COUNT:
+            raise ValueError(
+                "HMM prefilter expects chunk probabilities with shape "
+                f"(chunk_length, {GENE_LABEL_COUNT}), got {chunk_probs.shape}."
+            )
+
+        cds_prob = chunk_probs[:, CDS_LABEL_INDICES].sum(axis=-1)
+        if cds_prob.size == 0:
+            return False
+
+        window = HMM_PREFILTER_WINDOW
+        if cds_prob.size < window:
+            return float(cds_prob.mean()) >= HMM_PREFILTER_CDS_THRESHOLD
+
+        cumsum = np.cumsum(cds_prob, dtype=np.float32)
+        window_sums = cumsum[window - 1:] - np.concatenate(([0.0], cumsum[:-window]))
+        return float(window_sums.max()) / window >= HMM_PREFILTER_CDS_THRESHOLD
 
     def _read_model_config(self):
         config_path = os.path.join(self.model_path, "config.json")
@@ -172,16 +204,28 @@ class PredictionGTF:
 
         from .model_packages import OrionGenoForJointLabeling
 
+        # low_cpu_mem_usage=True loads checkpoint weights straight into empty
+        # tensors and skips the random _init_weights pass that is immediately
+        # overwritten by checkpoint values. The nested fallback keeps both
+        # dtype-vs-torch_dtype compatibility and older transformers support.
+        def _from_pretrained(**extra):
+            try:
+                return OrionGenoForJointLabeling.from_pretrained(
+                    self.model_path,
+                    dtype=INFERENCE_DTYPE,
+                    **extra,
+                )
+            except TypeError:
+                return OrionGenoForJointLabeling.from_pretrained(
+                    self.model_path,
+                    torch_dtype=INFERENCE_DTYPE,
+                    **extra,
+                )
+
         try:
-            model = OrionGenoForJointLabeling.from_pretrained(
-                self.model_path,
-                dtype=INFERENCE_DTYPE,
-            )
+            model = _from_pretrained(low_cpu_mem_usage=True)
         except TypeError:
-            model = OrionGenoForJointLabeling.from_pretrained(
-                self.model_path,
-                torch_dtype=INFERENCE_DTYPE,
-            )
+            model = _from_pretrained()
         settings = getattr(model.config, "settings", {}) or {}
         self.gene_label_count = int(settings.get("gene_label_count", model.gene_label_count))
         self.repeat_label_count = int(settings.get("repeat_label_count", model.repeat_label_count))
@@ -202,6 +246,8 @@ class PredictionGTF:
         for module in model.modules():
             if hasattr(module, "residual_in_fp32"):
                 module.residual_in_fp32 = True
+        # Tied weights share one tensor object, so .to() only moves shared
+        # parameters once and is a near-noop for tensors already on target.
         model = model.to(device=self.model_device, dtype=INFERENCE_DTYPE)
         for param in model.parameters():
             param.requires_grad = False
@@ -351,15 +397,16 @@ class PredictionGTF:
             pass
 
     def adapt_batch_size(self, adapted_chunksize):
-        """Increase the batch size when adaptive chunking shortens the model window."""
-        old_adapted_batch_size = self.adapted_batch_size
+        """Update the forward-pass batch size for the adapted model window.
+
+        The model forward accepts any batch size at runtime, so changing it only
+        updates ``self.adapted_batch_size`` and never reloads the checkpoint.
+        """
         if adapted_chunksize < self.seq_len:
             self.adapted_batch_size = self.batch_size * self.seq_len // adapted_chunksize
             self.adapted_batch_size = 2 ** int(np.log2(max(1, self.adapted_batch_size)))
         else:
             self.adapted_batch_size = self.batch_size
-        if self.adapted_batch_size != old_adapted_batch_size:
-            self.load_model(summary=False)
 
     def init_fasta(self, genome_path=None, chunk_len=None, min_seq_len=0):
         if genome_path is None:
@@ -521,8 +568,6 @@ class PredictionGTF:
     def sequence_prediction(
         self,
         inp_chunks,
-        clamsa_inp=None,
-        trans_emb=None,
         save=True,
         batch_size=None,
         output_gene=True,
@@ -531,25 +576,21 @@ class PredictionGTF:
         """Generate raw model-head predictions from OrionGeno.
 
         Arguments:
-            inp_ids (np.array): The input IDs for the sequence model, expected to be in a numpy array format.
-            clamsa_inp (np.array): Optional clamsa input with same size as inp_chunks.
-            trans_emb (np.array): Optional sequence embedding input with same size as inp_chunks.
+            inp_chunks (np.ndarray): One-hot encoded nucleotide chunks for the sequence model
+                (converted to token ids internally).
             save (bool): A flag to indicate whether the predictions should be saved/loaded to/from a file.
-            output_gene (bool): Return gene-head probabilities for downstream HMM/GTF generation.
+            output_gene (bool): Return gene-head probabilities for downstream HMM/annotation generation.
             output_repeat (bool): Return repeat-head binary argmax labels without smoothing.
 
         Returns:
-            np.ndarray or dict: Gene probabilities for the legacy gene-only path, otherwise a
+            torch.Tensor or dict: Gene-head probability tensor for the legacy gene-only path, otherwise a
             dictionary containing requested heads. Repeat output is already argmax-decoded.
         """
         if not output_gene and not output_repeat:
             raise ValueError("At least one of output_gene or output_repeat must be True.")
-        if clamsa_inp is not None and (output_repeat or not output_gene):
-            raise NotImplementedError("Repeat-only/head selection is not implemented for clamsa input.")
-
         if not batch_size:
             batch_size = self.adapted_batch_size
-        num_batches = inp_chunks.shape[0] // batch_size
+        batch_size = max(1, int(batch_size))
         gene_predictions = []
         repeat_predictions = []
         legacy_gene_only = output_gene and not output_repeat
@@ -575,40 +616,60 @@ class PredictionGTF:
                 result["repeat"] = cached["repeat"]
             return result
 
-        if inp_chunks.shape[0] % batch_size > 0:
-            num_batches += 1
-        for i in tqdm(range(num_batches), desc="Model prediction:"):
-            start_pos = i * batch_size
-            end_pos = (i + 1) * batch_size
-            if clamsa_inp is not None:
-                y = self.sequence_model.predict_on_batch(
-                    [inp_chunks[start_pos:end_pos], clamsa_inp[start_pos:end_pos]]
-                )
-                if len(y.shape) == 1:
-                    y = np.expand_dims(y, 0)
-                gene_predictions.append(y)
-            else:
-                input_ids = torch.as_tensor(inp_chunks[start_pos:end_pos])
-                input_ids = torch.argmax(input_ids, dim=-1).to(self.model_device)
-                with torch.inference_mode():
-                    model_output = self._call_sequence_model(input_ids)
+        chunk_count = inp_chunks.shape[0]
+        chunk_pos = 0
+        with tqdm(total=chunk_count, desc="Model prediction:") as progress:
+            while chunk_pos < chunk_count:
+                current_batch = min(batch_size, chunk_count - chunk_pos)
+                input_ids = None
+                model_output = None
+                gene_head = None
+                repeat_head = None
+                probabilities = None
+                try:
+                    start_pos = chunk_pos
+                    end_pos = chunk_pos + current_batch
+                    input_ids = torch.as_tensor(inp_chunks[start_pos:end_pos])
+                    input_ids = torch.argmax(input_ids, dim=-1).to(self.model_device)
+                    with torch.inference_mode():
+                        model_output = self._call_sequence_model(input_ids)
+                        y_gene = None
+                        y_repeat = None
+                        if output_gene:
+                            gene_head = self._extract_gene_head(model_output)
+                            probability_dtype = self._hmm_dtype() if self.hmm else None
+                            probabilities = self._as_probabilities(
+                                gene_head,
+                                dtype=probability_dtype,
+                            )
+                            y_gene = probabilities.detach().to(dtype=torch.float16).cpu()
+                        if output_repeat:
+                            repeat_head = self._extract_repeat_head(model_output)
+                            y_repeat = repeat_head.argmax(dim=-1).detach().cpu().numpy()
+                            if len(y_repeat.shape) == 1:
+                                y_repeat = np.expand_dims(y_repeat, 0)
+                            y_repeat = y_repeat.astype(np.int8, copy=False)
                     if output_gene:
-                        gene_head = self._extract_gene_head(model_output)
-                        probability_dtype = self._hmm_dtype() if self.hmm else None
-                        probabilities = self._as_probabilities(
-                            gene_head,
-                            dtype=probability_dtype,
-                        )
-                        y_gene = probabilities.detach().to(dtype=torch.float16).cpu()
                         gene_predictions.append(y_gene)
                     if output_repeat:
-                        repeat_head = self._extract_repeat_head(model_output)
-                        y_repeat = repeat_head.argmax(dim=-1).detach().cpu().numpy()
-                        if len(y_repeat.shape) == 1:
-                            y_repeat = np.expand_dims(y_repeat, 0)
-                        repeat_predictions.append(y_repeat.astype(np.int8, copy=False))
-                del input_ids, model_output
-                self._release_cuda_cache()
+                        repeat_predictions.append(y_repeat)
+                    chunk_pos = end_pos
+                    progress.update(current_batch)
+                    del input_ids, model_output, gene_head, repeat_head, probabilities
+                    self._release_cuda_cache()
+                except torch.cuda.OutOfMemoryError:
+                    del input_ids, model_output, gene_head, repeat_head, probabilities
+                    self._release_cuda_cache(force=True)
+                    if current_batch <= 1:
+                        raise
+                    next_batch = max(1, current_batch // 2)
+                    logging.warning(
+                        "Model-forward batch of %d hit CUDA OOM; retrying with batch_size=%d.",
+                        current_batch,
+                        next_batch,
+                    )
+                    batch_size = next_batch
+                    self.adapted_batch_size = min(self.adapted_batch_size, next_batch)
         result = {}
         if output_gene:
             result["gene"] = torch.cat(gene_predictions, dim=0)
@@ -631,62 +692,14 @@ class PredictionGTF:
             return result["gene"]
         return result
 
-    def hmm_prediction(self, nuc_seq, sequence_predictions, save=True, batch_size=None):
-        """Generate HMM-smoothed predictions with Viterbi decoding.
-
-        Arguments:
-            nuc_seq (np.array): One hot encoded representation of the input nucleotide sequence.
-            sequence_predictions (np.array): Gene label probabilities from OrionGeno.
-            save (bool): A flag to indicate whether the predictions should be saved/loaded to/from a file.
-
-        Returns:
-            np.ndarray: HMM-decoded labels.
-        """
-        if not batch_size:
-            batch_size = self.adapted_batch_size
-        num_batches = nuc_seq.shape[0] // batch_size
-        hmm_predictions = []
-        print("### Running HMM Viterbi decoding")
-        if (
-            save
-            and self.temp_dir
-            and os.path.exists(f"{self.temp_dir}/hmm_predictions.npy")
-        ):
-            hmm_predictions = np.load(f"{self.temp_dir}/hmm_predictions.npy")
-            return hmm_predictions
-
-        if nuc_seq.shape[0] % batch_size > 0:
-            num_batches += 1
-        for i in tqdm(
-            range(num_batches), desc=f"HMM prediction: {sequence_predictions.shape}"
-        ):
-            start_pos = i * batch_size
-            end_pos = (i + 1) * batch_size
-            y_hmm = (
-                self.predict_vit(
-                    nuc_seq[start_pos:end_pos], sequence_predictions[start_pos:end_pos]
-                )
-                .cpu()
-                .numpy()
-                .squeeze()
-            )
-            if len(y_hmm.shape) == 1:
-                y_hmm = np.expand_dims(y_hmm, 0)
-            hmm_predictions.append(y_hmm)
-            self._release_cuda_cache()
-        hmm_predictions = np.concatenate(hmm_predictions, axis=0)
-        if save and self.temp_dir:
-            np.save(f"{self.temp_dir}/hmm_predictions.npy", hmm_predictions)
-        return hmm_predictions
-
     def hmm_predictions_filtered(
         self, inp_chunks, sequence_predictions, save=True, batch_size=None
     ):
         """Generate HMM predictions after a lightweight pre-filter.
         It first analyzes the gene label probabilities from OrionGeno over
         windows of 200 base pairs (bp) in length. The HMM makes predictions on
-        an example only if there's at least one window where the average class
-        probability for the CDS class is 0.8 or higher. If no such window exists,
+        an example only if there's at least one window where the average summed
+        probability across the CDS-mapped states is 0.8 or higher. If no such window exists,
         the HMM will skip making predictions for that example, and all positions
         within it are labeled as intergenic region.
 
@@ -701,6 +714,10 @@ class PredictionGTF:
         if not batch_size:
             batch_size = self.adapted_batch_size
 
+        # Decode batch is decoupled from the model-forward batch: when set, use
+        # it to fill larger Viterbi batches and amortize kernel-launch overhead.
+        decode_batch = self.hmm_decode_batch if self.hmm_decode_batch > 0 else batch_size
+
         print("### Running HMM Viterbi filtered decoding")
 
         hmm_predictions = []
@@ -713,27 +730,15 @@ class PredictionGTF:
             hmm_predictions = np.load(f"{self.temp_dir}/hmm_predictions.npy")
             return hmm_predictions
 
-        if self.hmm_factor > 1:
-            inp_chunks = inp_chunks.reshape(
-                (
-                    inp_chunks.shape[0] * self.hmm_factor,
-                    inp_chunks.shape[1] // self.hmm_factor,
-                    -1,
-                )
-            )
-            sequence_predictions[0] = sequence_predictions[0].reshape(
-                (
-                    sequence_predictions[0].shape[0] * self.hmm_factor,
-                    sequence_predictions[0].shape[1] // self.hmm_factor,
-                    -1,
-                )
-            )
-            sequence_predictions[1] = sequence_predictions[1].reshape(
-                (
-                    sequence_predictions[1].shape[0] * self.hmm_factor,
-                    sequence_predictions[1].shape[1] // self.hmm_factor,
-                    -1,
-                )
+        prefilter_probs = (
+            sequence_predictions.detach().cpu().numpy()
+            if torch.is_tensor(sequence_predictions)
+            else np.asarray(sequence_predictions)
+        )
+        if prefilter_probs.ndim != 3 or prefilter_probs.shape[-1] != GENE_LABEL_COUNT:
+            raise ValueError(
+                "HMM filtered prediction expects probabilities with shape "
+                f"(num_chunks, chunk_length, {GENE_LABEL_COUNT}), got {prefilter_probs.shape}."
             )
 
         batch_i = []
@@ -744,21 +749,17 @@ class PredictionGTF:
             range(inp_chunks.shape[0]),
             desc=f"HMM filtered prediction: {hmm_predictions.shape}",
         ):
-            slide_mean = 0
-            if slide_mean < 0.8:
+            if self._chunk_has_cds_signal(prefilter_probs[i]):
                 batch_i += [i]
             else:
-                hmm_predictions[i] = sequence_predictions[0][i].argmax(-1)
+                hmm_predictions[i] = 0
 
-            if (
-                len(batch_i) == batch_size * self.hmm_factor
+            if batch_i and (
+                len(batch_i) == decode_batch
                 or i == inp_chunks.shape[0] - 1
             ):
-                y_hmm = (
-                    self.predict_vit(inp_chunks[batch_i], sequence_predictions[batch_i])
-                    .cpu()
-                    .numpy()
-                    .squeeze()
+                y_hmm = self._decode_vit_batch(
+                    inp_chunks, sequence_predictions, batch_i
                 )
                 if len(y_hmm.shape) == 1:
                     y_hmm = np.expand_dims(y_hmm, 0)
@@ -772,11 +773,49 @@ class PredictionGTF:
             np.save(f"{self.temp_dir}/hmm_predictions.npy", hmm_predictions)
         return hmm_predictions
 
+    def _decode_vit_batch(self, inp_chunks, sequence_predictions, batch_i):
+        """Run Viterbi on a batch of chunk indices, halving on CUDA OOM.
+
+        Larger HMM decode batches give the CPU decoder more batch-level work and
+        amortize per-step kernel-launch overhead on the GPU fallback path. The
+        emission step's memory grows with the batch. If the device runs out of
+        memory we recursively split the batch in half and retry, so a too large
+        ORIONGENO_HMM_DECODE_BATCH degrades gracefully instead of crashing.
+        """
+        try:
+            y_hmm = (
+                self.predict_vit(
+                    inp_chunks[batch_i], sequence_predictions[batch_i]
+                )
+                .cpu()
+                .numpy()
+                .squeeze()
+            )
+            if len(y_hmm.shape) == 1:
+                y_hmm = np.expand_dims(y_hmm, 0)
+            return y_hmm
+        except torch.cuda.OutOfMemoryError:
+            if len(batch_i) <= 1:
+                raise
+            self._release_cuda_cache(force=True)
+            mid = len(batch_i) // 2
+            logging.warning(
+                "HMM decode batch of %d hit CUDA OOM; retrying as %d + %d.",
+                len(batch_i),
+                mid,
+                len(batch_i) - mid,
+            )
+            left = self._decode_vit_batch(
+                inp_chunks, sequence_predictions, batch_i[:mid]
+            )
+            right = self._decode_vit_batch(
+                inp_chunks, sequence_predictions, batch_i[mid:]
+            )
+            return np.concatenate([left, right], axis=0)
+
     def get_predictions(
         self,
         inp_chunks,
-        clamsa_inp=None,
-        hmm_filter=False,
         save=True,
         encoding_layer_oracle=None,
         batch_size=None,
@@ -785,10 +824,10 @@ class PredictionGTF:
 
         Args:
             inp_chunks (np.ndarray): Input chunks for which to get predictions.
-            clamsa_inp (np.array): Optional clamsa input with same size as inp_chunks.
-            hmm_filter (bool): Use the filtered HMM path.
             save (bool): A flag to indicate whether the predictions should be saved/loaded to/from a file.
-            encoding_layer_oracle (bool): Can be used to skip the encoding layer and use the provided predictions. Use for debugging.
+            encoding_layer_oracle (np.ndarray or None): Pre-computed gene-label predictions. When provided
+                (not None), the sequence model forward pass is skipped and these predictions are used directly.
+                Use for debugging.
 
         Returns:
             np.ndarray: HMM predictions for all chunks.
@@ -801,7 +840,7 @@ class PredictionGTF:
             encoding_layer_pred = encoding_layer_oracle
         else:
             encoding_layer_pred = self.sequence_prediction(
-                inp_chunks, clamsa_inp=clamsa_inp, save=save, batch_size=batch_size
+                inp_chunks, save=save, batch_size=batch_size
             )
 
         self.sequence_predictions = encoding_layer_pred
@@ -815,14 +854,9 @@ class PredictionGTF:
                 encoding_layer_pred = np.argmax(encoding_layer_pred, axis=-1)
             return encoding_layer_pred
 
-        if hmm_filter:
-            hmm_predictions = self.hmm_predictions_filtered(
-                inp_chunks, encoding_layer_pred, save=save, batch_size=batch_size
-            )
-        else:
-            hmm_predictions = self.hmm_prediction(
-                inp_chunks, encoding_layer_pred, save=save, batch_size=batch_size
-            )
+        hmm_predictions = self.hmm_predictions_filtered(
+            inp_chunks, encoding_layer_pred, save=save, batch_size=batch_size
+        )
         hmm_end = time.time()
         duration = hmm_end - model_end
         print(f"HMM took {duration/60:.4f} minutes to execute.")
@@ -831,8 +865,6 @@ class PredictionGTF:
     def get_prediction_outputs(
         self,
         inp_chunks,
-        clamsa_inp=None,
-        hmm_filter=False,
         save=True,
         encoding_layer_oracle=None,
         batch_size=None,
@@ -853,7 +885,6 @@ class PredictionGTF:
         else:
             raw_heads = self.sequence_prediction(
                 inp_chunks,
-                clamsa_inp=clamsa_inp,
                 save=save,
                 batch_size=batch_size,
                 output_gene=output_gene,
@@ -875,15 +906,8 @@ class PredictionGTF:
                     outputs["gene"] = gene_predictions.argmax(dim=-1).cpu().numpy()
                 else:
                     outputs["gene"] = np.argmax(gene_predictions, axis=-1)
-            elif hmm_filter:
-                outputs["gene"] = self.hmm_predictions_filtered(
-                    inp_chunks,
-                    gene_predictions,
-                    save=save,
-                    batch_size=batch_size,
-                )
             else:
-                outputs["gene"] = self.hmm_prediction(
+                outputs["gene"] = self.hmm_predictions_filtered(
                     inp_chunks,
                     gene_predictions,
                     save=save,
@@ -897,12 +921,12 @@ class PredictionGTF:
             outputs["repeat"] = raw_heads["repeat"]
 
         return outputs
-
     def predict_vit(self, x, gene_outputs):
         """Perform prediction using Viterbi decoding on gene label probabilities.
 
         This method applies the Viterbi algorithm to OrionGeno gene label probabilities
-        to find the most likely sequence of hidden states.
+        to find the most likely sequence of hidden states. When enabled, candidate genic
+        regions are detected first to reduce Viterbi workload on intergenic sequences.
 
         Args:
             x (np.ndarray): Encoded nucleotide input for the current batch.
@@ -933,68 +957,63 @@ class PredictionGTF:
 
         if not self.hmm:
             return gene_probabilities.argmax(dim=-1)
-        with self._disabled_autocast(device):
-            return self.gene_pred_hmm_layer.viterbi(gene_probabilities, nucleotides=nuc)
 
-    def merge_re_prediction(self, all_tx, new_tx, breakpoint):
-        """Merges two sets of transcript predictions (`all_tx` and `new_tx`) at a specified breakpoint.
+        # Candidate genic region filtering (controlled by ORIONGENO_GENIC_REGION_FILTER)
+        # Default OFF after validation showed it slows down gene-dense sequences.
+        # Benefits expected on sparse genomes (>60% intergenic) with long scaffolds (>10Mb).
+        # Set ORIONGENO_GENIC_REGION_FILTER=1 to force enable, or =auto for heuristic.
+        filter_mode = os.environ.get("ORIONGENO_GENIC_REGION_FILTER", "0").lower()
 
-        This function integrates predictions from two different prediction sets by considering their overlaps and the
-        specified breakpoint. It aims to create a combined prediction that respects the continuity of transcripts across
-        the breakpoint, favoring the retention of longer transcripts or more accurate predictions based on the overlap
-        analysis.
-
-        Arguments:
-            all_tx (list of tuples): The list of all current transcript predictions before the breakpoint. Each element in
-                                       the list is a tuple representing a transcript with its start and end positions.
-            new_tx (list of tuples): The list of new transcript predictions that may overlap with `all_tx` at the breakpoint.
-            breakpoint (int): The position in the sequence where the division between the old and new predictions is made.
-
-        Returns:
-            list of tuples: The merged list of transcript predictions, considering the breakpoint and overlaps between
-                          `all_tx` and `new_tx`.
-
-        The merging process follows these rules:
-        - If one of the prediction sets is empty, it returns the concatenation of both.
-        - If the breakpoint is in the intergenic region (outside the range of any transcripts in both sets), it merges
-          the predictions without overlapping transcripts.
-        - If the breakpoint indicates overlapping regions but no direct overlap between transcripts, it concatenates
-          the predictions up to and from the breakpoint.
-        - If there's an overlap and one of the transcripts surrounding the breakpoint is larger, the larger transcript
-          is preferred in the merged output.
-        """
-        overlap1 = 0
-        for i, tx in enumerate(all_tx):
-            if breakpoint < tx[0][1]:
-                break
-            overlap1 = i
-        overlap2 = 0
-        for i, tx in enumerate(new_tx):
-            if breakpoint < tx[0][1]:
-                break
-            overlap2 = i
-
-        if not all_tx or not new_tx:
-            # One side has no transcript to merge.
-            return all_tx + new_tx
-        elif (
-            breakpoint > all_tx[overlap1][-1][2]
-            and breakpoint > new_tx[overlap2][-1][2]
-        ):
-            # The breakpoint is intergenic in both prediction sets.
-            return all_tx[: overlap1 + 1] + new_tx[overlap2 + 1 :]
-        elif all_tx[overlap1][-1][2] < new_tx[overlap2][0][1]:
-            # The breakpoint hits a transcript, but the transcript ranges do not overlap.
-            return all_tx[: overlap1 + 1] + new_tx[overlap2:]
-        elif (
-            all_tx[overlap1][-1][2] - all_tx[overlap1][0][1]
-            > new_tx[overlap2][-1][2] - new_tx[overlap2][0][1]
-        ):
-            # Keep the longer transcript from the existing predictions.
-            return all_tx[: overlap1 + 1] + new_tx[overlap2 + 1 :]
+        if filter_mode == "auto":
+            # Heuristic: enable only for long sequences (likely sparse genomes)
+            batch_size, seq_len, num_states = gene_probabilities.shape
+            use_region_filter = seq_len > 5_000_000
         else:
-            # Keep the longer transcript from the new predictions.
-            return all_tx[:overlap1] + new_tx[overlap2:]
+            use_region_filter = filter_mode not in {"0", "false", "no", "off"}
+
+        with self._disabled_autocast(device):
+            if not use_region_filter:
+                # Original path: decode the full sequence
+                return self.gene_pred_hmm_layer.viterbi(gene_probabilities, nucleotides=nuc)
+
+            # Import here to avoid overhead when disabled
+            from .hmm_layer.genic_region_filter import filter_genic_regions
+
+            batch_size, seq_len, num_states = gene_probabilities.shape
+            if batch_size != 1:
+                # Region filtering only supports batch=1; fall back to full decode
+                return self.gene_pred_hmm_layer.viterbi(gene_probabilities, nucleotides=nuc)
+
+            # Detect candidate genic regions
+            genic_regions = filter_genic_regions(
+                gene_probabilities,
+                min_avg_threshold=0.1,
+                max_threshold=0.5,
+                min_cds_length=50,
+                buffer_size=100,
+                step=50,
+            )
+
+            # If the entire sequence is one region, decode as normal
+            if len(genic_regions) == 1 and genic_regions[0] == (0, seq_len):
+                return self.gene_pred_hmm_layer.viterbi(gene_probabilities, nucleotides=nuc)
+
+            # Decode each genic region independently and fill intergenic with state 0
+            viterbi_paths = torch.zeros(batch_size, seq_len, dtype=torch.long, device=device)
+
+            for start, end in genic_regions:
+                # Slice the region (end is inclusive in our representation)
+                region_probs = gene_probabilities[:, start:end+1, :]
+                region_nuc = nuc[:, start:end+1, :]
+
+                # Decode this region
+                region_path = self.gene_pred_hmm_layer.viterbi(region_probs, nucleotides=region_nuc)
+
+                # Copy into full path
+                viterbi_paths[:, start:end+1] = region_path
+
+            return viterbi_paths
+
 
     def get_tx_from_range(self, range_):
         """Split feature ranges into complete and boundary-fragmented transcripts.
@@ -1024,13 +1043,12 @@ class PredictionGTF:
             txs = txs[1:]
         return initial_tx, txs, current_tx
 
-    def create_gtf(
+    def create_gene_annotation(
         self,
         y_label,
         coords,
         f_chunks,
         out_file="",
-        clamsa_inp=None,
         strand="+",
         correct_y_label=None,
         anno=None,
@@ -1038,17 +1056,16 @@ class PredictionGTF:
         filt=True,
         allow_boundary_reprediction=True,
     ):
-        """Create a GTF file with the gene annotations from predictions.
+        """Create gene annotation records from predictions.
 
-        This method translates model predictions into GTF records. Optional boundary
+        This method translates model predictions into annotation records. Optional boundary
         re-prediction reruns a centered window around disagreeing chunk borders.
 
         Args:
             y_label (np.ndarray): The array of encoded labels predicted by the model.
             coords (np.ndarray): The array of genomic coordinates: [seq_name, strand, chunk_start, chunk_end].
-            out_file (str): Path to the output GTF file to which the annotations will be written.
+            out_file (str): Path to the output annotation file.
             f_chunks (np.array): One hot encoded nucleotide sequence.
-            clamsa_inp (np.array): Optional clamsa input with same size as inp_chunks.
             correct_y_label (np.array): Correct y_label for debugging.
         """
         batch_size = max(1, self.adapted_batch_size)
@@ -1064,10 +1081,9 @@ class PredictionGTF:
         # Accumulate transcript feature ranges by sequence name.
         ranges = {}
         if not anno:
-            anno = Anno(out_file, f"anno")
+            anno = Anno(out_file, "anno")
 
         re_pred_inp = []
-        re_clamsa_inp = []
         re_correct_y_label = []
         re_pred_meta = []
 
@@ -1076,38 +1092,32 @@ class PredictionGTF:
                 if coords[i][0] == coords[i + 1][0] and not (
                     y_label[i, -1] == y_label[i + 1, 0]
                 ):
-                    window_len = int(f_chunks[i].shape[0])
-                    left_context = window_len // 2
-                    right_context = window_len - left_context
+                    left_context = int(f_chunks[i].shape[0])
+                    right_context = int(f_chunks[i + 1].shape[0])
                     if left_context <= 0 or right_context <= 0:
                         continue
+                    if left_context != right_context:
+                        raise ValueError(
+                            "Boundary re-prediction requires equal adjacent chunk "
+                            f"lengths, got {left_context} and {right_context}."
+                        )
 
                     if coords[i][1] == "+":
                         re_pred_inp.append(
                             np.concatenate(
                                 [
-                                    f_chunks[i][-left_context:],
-                                    f_chunks[i + 1][:right_context],
+                                    f_chunks[i],
+                                    f_chunks[i + 1],
                                 ],
                                 axis=0,
                             )
                         )
-                        if clamsa_inp is not None:
-                            re_clamsa_inp.append(
-                                np.concatenate(
-                                    [
-                                        clamsa_inp[i][-left_context:],
-                                        clamsa_inp[i + 1][:right_context],
-                                    ],
-                                    axis=0,
-                                )
-                            )
                         if correct_y_label is not None:
                             re_correct_y_label.append(
                                 np.concatenate(
                                     [
-                                        correct_y_label[i][-left_context:],
-                                        correct_y_label[i + 1][:right_context],
+                                        correct_y_label[i],
+                                        correct_y_label[i + 1],
                                     ],
                                     axis=0,
                                 )
@@ -1118,34 +1128,24 @@ class PredictionGTF:
                         re_pred_inp.append(
                             np.concatenate(
                                 [
-                                    f_chunks[i + 1][-left_context:],
-                                    f_chunks[i][:right_context],
+                                    f_chunks[i + 1],
+                                    f_chunks[i],
                                 ],
                                 axis=0,
                             )
                         )
-                        if clamsa_inp is not None:
-                            re_clamsa_inp.append(
-                                np.concatenate(
-                                    [
-                                        clamsa_inp[i + 1][-left_context:],
-                                        clamsa_inp[i][:right_context],
-                                    ],
-                                    axis=0,
-                                )
-                            )
                         if correct_y_label is not None:
                             re_correct_y_label.append(
                                 np.concatenate(
                                     [
-                                        correct_y_label[i + 1][-left_context:],
-                                        correct_y_label[i][:right_context],
+                                        correct_y_label[i + 1],
+                                        correct_y_label[i],
                                     ],
                                     axis=0,
                                 )
                             )
-                        left_replace = right_context
-                        right_replace = left_context
+                        left_replace = left_context
+                        right_replace = right_context
 
                     re_pred_meta.append(
                         {
@@ -1156,29 +1156,23 @@ class PredictionGTF:
                         }
                     )
 
-        # Re-predict ambiguous chunk boundaries with windows no longer than the
-        # normal model window, then replace only the local boundary labels.
+        # Re-predict ambiguous chunk boundaries using both complete adjacent
+        # chunks, producing a centered window twice the normal chunk length.
         if re_pred_inp:
             re_pred_inp = np.stack(re_pred_inp, axis=0)
-            re_clamsa_inp = np.stack(re_clamsa_inp, axis=0) if re_clamsa_inp else None
             re_correct_y_label = (
                 np.stack(re_correct_y_label, axis=0) if re_correct_y_label else None
             )
-            if clamsa_inp is not None:
-                re_pred = self.get_predictions(
-                    re_pred_inp,
-                    clamsa_inp=re_clamsa_inp,
-                    save=False,
-                    batch_size=batch_size,
-                    encoding_layer_oracle=re_correct_y_label,
-                )
-            else:
-                re_pred = self.get_predictions(
-                    re_pred_inp,
-                    save=False,
-                    batch_size=batch_size,
-                    encoding_layer_oracle=re_correct_y_label,
-                )
+            boundary_batch_size = max(
+                1,
+                batch_size // BOUNDARY_REPREDICTION_LENGTH_FACTOR,
+            )
+            re_pred = self.get_predictions(
+                re_pred_inp,
+                save=False,
+                batch_size=boundary_batch_size,
+                encoding_layer_oracle=re_correct_y_label,
+            )
 
             for current_re, meta in zip(re_pred, re_pred_meta):
                 if meta["reverse"]:
@@ -1199,6 +1193,11 @@ class PredictionGTF:
                 current_seq_name = c[0]
                 end_fragment = []
 
+            valid_label_len = max(0, int(c[3]) - int(c[2]) + 1)
+            if valid_label_len <= 0:
+                continue
+            if valid_label_len < len(y):
+                y = y[:valid_label_len]
             y_ranges = self.get_ranges(y, c[2])
             is_ir = "intergenic" in [r[0] for r in y_ranges]
             start_fragment, txs, new_end_fragment = self.get_tx_from_range(y_ranges)
@@ -1224,7 +1223,6 @@ class PredictionGTF:
                 end_fragment = new_end_fragment
 
         for seq in ranges:
-            new_tx = False
             phase = -1
             for tx in ranges[seq]:
                 tx_id += 1
@@ -1270,19 +1268,19 @@ class PredictionGTF:
     def get_ranges(self, encoded_labels, offset=0):
         """Convert encoded label runs into genomic feature ranges.
 
-        This method reduces the 20-label state sequence to GTF feature classes,
+        This method reduces the 20-label state sequence to gene feature classes,
         then groups consecutive positions with the same feature label.
 
         Args:
             encoded_labels (Iterable[int]): Encoded labels representing genomic features.
 
         Returns:
-            List[Tuple[str, int, int]]: A list of tuples where each tuple contains the feature type
+            List[List]: A list of three-element lists where each list contains the feature type
             as a string and the start and end points as integers.
         """
         arr = np.array(encoded_labels)
 
-        arr = self.reduce_label(arr, self.num_hmm)
+        arr = self.reduce_label(arr)
 
         # Split the label vector at every class change.
         change_points = np.where(np.diff(arr) != 0)[0]

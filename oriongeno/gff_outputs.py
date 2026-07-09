@@ -1,4 +1,4 @@
-"""GTF filtering and repeat-output helpers."""
+"""Gene filtering and GFF-oriented annotation output helpers."""
 
 from __future__ import annotations
 
@@ -8,25 +8,30 @@ import os
 
 import numpy as np
 
+from .constants import DEFAULT_GENE_FILTER_MODE
+
+
+def annotation_output_is_gff(output_path):
+    path_text = os.fspath(output_path).lower()
+    if path_text.endswith(".gz"):
+        path_text = path_text[:-3]
+    return os.path.splitext(path_text)[1] in {".gff", ".gff3"}
+
+
+def annotation_output_format(output_path):
+    return "GFF" if annotation_output_is_gff(output_path) else "GTF"
+
+
 def repeat_output_path(output_base):
-    """Return the user-facing repeat GTF path beside the requested output."""
+    """Return the user-facing repeat annotation path beside the requested output."""
     root, ext = os.path.splitext(os.fspath(output_base))
     if ext:
         return f"{root}.repeat{ext}"
-    return f"{os.fspath(output_base)}.repeat.gtf"
-
-
-def strict_output_path(output_base):
-    """Return the strict-filtered gene GTF path for a requested output base."""
-    root, ext = os.path.splitext(os.fspath(output_base))
-    if ext:
-        return f"{root}.strict{ext}"
-    return f"{os.fspath(output_base)}.strict.gtf"
+    return f"{os.fspath(output_base)}.repeat.gff"
 
 
 def _reset_transcript_lines(transcript):
     transcript.transcript_lines = {}
-    transcript.gtf = []
     transcript.start = -1
     transcript.end = -1
     transcript.cds_len = -1
@@ -34,7 +39,7 @@ def _reset_transcript_lines(transcript):
     transcript.source_method = ""
 
 
-def _clip_gtf_line_to_bounds(line, seq_len):
+def _clip_annotation_line_to_bounds(line, seq_len):
     clipped = list(line)
     start = int(clipped[3])
     end = int(clipped[4])
@@ -64,7 +69,7 @@ def _clip_transcripts_to_bounds(transcripts, genome_seq_dict):
             if feature_type in regenerated_features:
                 continue
             for line in lines:
-                clipped = _clip_gtf_line_to_bounds(line, int(seq_len))
+                clipped = _clip_annotation_line_to_bounds(line, int(seq_len))
                 if clipped is None:
                     removed_features += 1
                     continue
@@ -88,8 +93,8 @@ def _clip_transcripts_to_bounds(transcripts, genome_seq_dict):
     }
 
 
-def _write_prediction_gtf(transcripts, output_path, id_prefix, genome_seq_dict=None):
-    from .genome_anno import Anno
+def _write_prediction_gff(transcripts, output_path, id_prefix, genome_seq_dict=None):
+    from .genome_annotation import Anno
 
     annotation = Anno("", "oriongeno")
     annotation.add_transcripts(copy.deepcopy(transcripts))
@@ -97,7 +102,7 @@ def _write_prediction_gtf(transcripts, output_path, id_prefix, genome_seq_dict=N
         clip_stats = _clip_transcripts_to_bounds(annotation.transcripts, genome_seq_dict)
         if any(clip_stats.values()):
             logging.info(
-                "Adjusted out-of-bound GTF coordinates: %s clipped features, "
+                "Adjusted out-of-bound annotation coordinates: %s clipped features, "
                 "%s removed features, %s removed transcripts.",
                 clip_stats["clipped_features"],
                 clip_stats["removed_features"],
@@ -106,12 +111,15 @@ def _write_prediction_gtf(transcripts, output_path, id_prefix, genome_seq_dict=N
     annotation.norm_tx_format()
     annotation.find_genes()
     annotation.rename_tx_ids(id_prefix)
-    annotation.write_anno(output_path)
+    if annotation_output_is_gff(output_path):
+        annotation.write_gff3(output_path)
+    else:
+        annotation.write_anno(output_path)
     return annotation
 
 
-class RepeatGtfWriter:
-    """Collect raw repeat-head labels and write positive runs as GTF rows."""
+class RepeatGffWriter:
+    """Collect raw repeat-head labels and write positive runs as annotation rows."""
 
     def __init__(
         self,
@@ -240,9 +248,14 @@ class RepeatGtfWriter:
             ),
         )
         with open(self.output_path, "w", encoding="utf-8") as file_obj:
+            if annotation_output_is_gff(self.output_path):
+                file_obj.write("##gff-version 3\n")
             for index, record in enumerate(sorted_records, start=1):
                 repeat_id = f"{self.id_prefix}r{index}" if self.id_prefix else f"r{index}"
-                attributes = f'repeat_id "{repeat_id}";'
+                if annotation_output_is_gff(self.output_path):
+                    attributes = f"ID={repeat_id}"
+                else:
+                    attributes = f'repeat_id "{repeat_id}";'
                 fields = [
                     record["seq_name"],
                     "OrionGeno",
@@ -255,8 +268,8 @@ class RepeatGtfWriter:
                     attributes,
                 ]
                 file_obj.write("\t".join(fields) + "\n")
-        logging.info("Repeat GTF records: %s", len(sorted_records))
-        logging.info("Repeat GTF output: %s", self.output_path)
+        logging.info("Repeat %s records: %s", annotation_output_format(self.output_path), len(sorted_records))
+        logging.info("Repeat %s output: %s", annotation_output_format(self.output_path), self.output_path)
         return self.output_path
 
 
@@ -289,11 +302,30 @@ def _strict_filter_transcripts(annotation, genome, genome_seq_dict):
     from tqdm import tqdm
 
     output_transcripts = {}
+    total_clip_stats = {
+        "clipped_features": 0,
+        "removed_features": 0,
+        "removed_transcripts": 0,
+    }
 
-    for transcript_id, transcript in tqdm(
+    for transcript_id, original_transcript in tqdm(
         annotation.transcripts.items(),
         desc="OrionGeno gene filtering",
     ):
+        if (
+            original_transcript.chr not in genome
+            or original_transcript.chr not in genome_seq_dict
+        ):
+            continue
+
+        transcript_map = {transcript_id: copy.deepcopy(original_transcript)}
+        clip_stats = _clip_transcripts_to_bounds(transcript_map, genome_seq_dict)
+        for key, value in clip_stats.items():
+            total_clip_stats[key] += value
+        if transcript_id not in transcript_map:
+            continue
+
+        transcript = transcript_map[transcript_id]
         exons = transcript.get_type_coords("CDS", frame=False)
         coding_seq, protein_seq = _assemble_transcript(
             exons,
@@ -314,6 +346,15 @@ def _strict_filter_transcripts(annotation, genome, genome_seq_dict):
             continue
         output_transcripts[transcript_id] = transcript
 
+    if any(total_clip_stats.values()):
+        logging.info(
+            "Adjusted out-of-bound annotation coordinates before strict filtering: "
+            "%s clipped features, %s removed features, %s removed transcripts.",
+            total_clip_stats["clipped_features"],
+            total_clip_stats["removed_features"],
+            total_clip_stats["removed_transcripts"],
+        )
+
     return output_transcripts
 
 
@@ -323,16 +364,17 @@ def filter_and_write_outputs(
     genome_seq_dict,
     output_path,
     id_prefix,
-    gene_filter_mode="none",
+    gene_filter_mode=DEFAULT_GENE_FILTER_MODE,
 ):
-    gene_filter_mode = (gene_filter_mode or "none").lower()
+    gene_filter_mode = (gene_filter_mode or DEFAULT_GENE_FILTER_MODE).lower()
     if gene_filter_mode == "none":
         logging.info(
-            "Gene GTF filtering disabled; writing %s predicted transcripts to %s.",
+            "Gene %s filtering disabled; writing %s predicted transcripts to %s.",
+            annotation_output_format(output_path),
             len(annotation.transcripts),
             output_path,
         )
-        return _write_prediction_gtf(
+        return _write_prediction_gff(
             annotation.transcripts,
             output_path,
             id_prefix,
@@ -342,7 +384,7 @@ def filter_and_write_outputs(
         raise ValueError(f"Unsupported gene_filter_mode: {gene_filter_mode!r}")
 
     output_transcripts = _strict_filter_transcripts(annotation, genome, genome_seq_dict)
-    return _write_prediction_gtf(
+    return _write_prediction_gff(
         output_transcripts,
         output_path,
         id_prefix,

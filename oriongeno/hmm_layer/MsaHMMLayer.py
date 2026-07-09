@@ -476,7 +476,10 @@ def _state_posterior_log_probs_impl(inputs, cell, reverse_cell,
                                                initial_state=(*forward_step_1_state, *backward_step_1_state),
                                                training=training)
     else:
-        # The placeholder keeps the return shape valid for two-position chunks.
+        # Two-position chunks have no interior to run through the bidirectional
+        # RNN; only the boundary states are needed (the posterior is rebuilt below
+        # from the two boundary cells). The zeros tensor is a throwaway for the
+        # debug show_value call and is discarded.
         posterior, states = torch.zeros(()), forward_step_1_state + backward_step_1_state
         if cell.use_step_counter:
             cell.step_counter += 1

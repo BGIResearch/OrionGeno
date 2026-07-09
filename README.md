@@ -59,6 +59,59 @@ downloaded wheels inside the repository directory, and documents the tested
 Python 3.10, PyTorch 2.7.0, CUDA 12.x, `mamba-ssm`, and `causal-conv1d`
 installation path.
 
+#### Docker
+
+A `Dockerfile` is provided as a ready-to-run alternative to the manual
+install above, using the same validated PyTorch, `mamba-ssm`/`causal-conv1d`,
+and `numba` versions. Model weights are **not** baked into the image;
+download them from Hugging Face or ModelScope (see Download Model Weights
+below) and mount the checkpoint directory at run time.
+
+```bash
+docker build -t oriongeno .
+```
+
+If the default PyPI/Debian mirrors are slow for you, pass a regional mirror
+at build time:
+
+```bash
+docker build \
+  --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ \
+  --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
+  -t oriongeno .
+```
+
+Run gene prediction on one GPU:
+
+```bash
+docker run --rm --gpus all \
+  -v /path/to/oriongeno-weights/oriongeno_mammals:/weights:ro \
+  -v /path/to/genome.fna:/data/genome.fna:ro \
+  -v /path/to/output:/data/out \
+  oriongeno \
+  --genome /data/genome.fna \
+  --output /data/out/oriongeno.gtf \
+  --checkpoint /weights
+```
+
+Run gene prediction on multiple GPUs:
+
+```bash
+docker run --rm --gpus all \
+  -v /path/to/oriongeno-weights/oriongeno_mammals:/weights:ro \
+  -v /path/to/genome.fna:/data/genome.fna:ro \
+  -v /path/to/output:/data/out \
+  oriongeno \
+  multi \
+  --genome /data/genome.fna \
+  --output /data/out/oriongeno.gtf \
+  --checkpoint /weights \
+  --devices 0,1,2,3
+```
+
+This requires a host with an NVIDIA GPU, a working NVIDIA driver, and Docker
+configured for GPU access (`docker run --gpus all ...` working).
+
 ## Download Model Weights
 
 Download the inference checkpoints from either Hugging Face or ModelScope via the links below:

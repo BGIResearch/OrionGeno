@@ -1,28 +1,35 @@
 __pycache__/
+*.py[cod]
+*$py.class
 
-.venv/
-venv/
-.env
-.idea/
+.ipynb_checkpoints/
 .vscode/
 
-/data/
-/output/
-/outputs/
-/checkpoints/
-/checkpoints_inference/
+output/
+outputs/
+checkpoints/
+wheels/
+.cache/
+.venv/
+.conda-envs/
+.conda-pkgs/
+.tmp/
 
 *.log
 *.tmp
-*.npz
-*.npy
+*.fna
+*.fa
+*.fasta
+*.fna.gz
+*.fa.gz
+*.fasta.gz
+*.tar
+*.tar.gz
+*.zip
 
-# Model weights are distributed separately through Hugging Face or ModelScope.
-*.bin
-*.pt
-*.pth
-*.safetensors
-
-/docs/img/*.pdf
-
-
+!tests/**/*.fna
+!tests/**/*.fa
+!tests/**/*.fasta
+!tests/**/*.fna.gz
+!tests/**/*.fa.gz
+!tests/**/*.fasta.gz

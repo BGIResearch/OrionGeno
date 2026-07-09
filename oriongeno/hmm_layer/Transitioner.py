@@ -230,7 +230,7 @@ class ProfileHMMTransitioner(nn.Module):
             return log_A_sparse
 
     def make_log_A(self):
-        """Build sparse log transition matrices."""
+        """Build dense log transition matrices."""
         log_A = self.make_log_A_sparse()
         log_A = log_A.to_dense()
         log_A = torch.where(log_A == 0, torch.full_like(log_A, self.approx_log_zero), log_A)
@@ -253,7 +253,7 @@ class ProfileHMMTransitioner(nn.Module):
             return A_sparse
 
     def make_A(self):
-        """Build sparse transition matrices."""
+        """Build dense transition matrices."""
         A = self.make_A_sparse()
         A = A.to_dense()
         return A

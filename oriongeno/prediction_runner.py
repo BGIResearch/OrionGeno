@@ -11,17 +11,35 @@ import time
 
 import numpy as np
 
-from .cli_config import check_file_exists, env_bool, env_int, env_str, str_to_bool
+from .cli_config import (
+    AUTO_VALUE,
+    auto_nonnegative_int,
+    auto_positive_int,
+    check_file_exists,
+    env_auto_nonnegative_int,
+    env_auto_positive_int,
+    env_bool,
+    env_int,
+    env_str,
+    is_auto,
+    str_to_bool,
+)
 from .constants import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_FLANK_SIZE,
     DEFAULT_FRAGMENTED_RECORD_THRESHOLD,
+    DEFAULT_GENE_FILTER_MODE,
+    DEFAULT_HMM_DECODE_BATCH,
     DEFAULT_MAX_CHUNKS_PER_INFERENCE_GROUP,
     DEFAULT_MAX_FASTA_RECORDS,
     DEFAULT_PACK_SPACER_LEN,
     DEFAULT_PACK_TARGET_SIZE,
+    DEFAULT_SEQUENCE_LENGTH,
     SEQUENCE_GROUP_SIZE,
 )
-from .gtf_outputs import (
-    RepeatGtfWriter,
+from .gff_outputs import (
+    RepeatGffWriter,
+    annotation_output_format,
     filter_and_write_outputs,
     repeat_output_path,
 )
@@ -35,23 +53,108 @@ from .data_processing.sequence_planning import (
 )
 
 
-ASSEMBLY_MODE = env_str("ORIONGENO_ASSEMBLY_MODE", "auto")
-FRAGMENTED_RECORD_THRESHOLD = env_int(
-    "ORIONGENO_FRAGMENTED_RECORD_THRESHOLD",
-    DEFAULT_FRAGMENTED_RECORD_THRESHOLD,
-)
-PACK_SPACER_LEN = env_int("ORIONGENO_PACK_SPACER_LEN", DEFAULT_PACK_SPACER_LEN)
-PACK_TARGET_SIZE = env_int("ORIONGENO_PACK_TARGET_SIZE", DEFAULT_PACK_TARGET_SIZE)
+ASSEMBLY_MODE = "auto"
+FRAGMENTED_RECORD_THRESHOLD = DEFAULT_FRAGMENTED_RECORD_THRESHOLD
+PACK_SPACER_LEN = DEFAULT_PACK_SPACER_LEN
+PACK_TARGET_SIZE = DEFAULT_PACK_TARGET_SIZE
 MIN_SEQ_LEN = 0
 PREDICTION_STRANDS = ("+", "-")
 USE_HMM = True
 UPPER_ONLY = True
-GROUP_TARGET_SIZE = env_int("ORIONGENO_SEQUENCE_GROUP_SIZE", SEQUENCE_GROUP_SIZE)
-BATCH_BOTH_STRANDS = env_bool("ORIONGENO_BATCH_BOTH_STRANDS", False)
-MAX_CHUNKS_PER_INFERENCE_GROUP = env_int(
-    "ORIONGENO_MAX_CHUNKS_PER_INFERENCE_GROUP",
-    DEFAULT_MAX_CHUNKS_PER_INFERENCE_GROUP,
-)
+GROUP_TARGET_SIZE = SEQUENCE_GROUP_SIZE
+BATCH_BOTH_STRANDS = True
+MAX_CHUNKS_PER_INFERENCE_GROUP = DEFAULT_MAX_CHUNKS_PER_INFERENCE_GROUP
+AUTO_BATCH_MEMORY_FRACTION = 0.82
+AUTO_BATCH_GIB_PER_BASE = 6.2e-6
+AUTO_BATCH_BASE_GIB = 0.5
+AUTO_BATCH_MAX = 64
+AUTO_HMM_DECODE_BATCH = 16
+
+
+def _load_runtime_env_config():
+    """Load optional prediction tuning from env at runtime, not import time."""
+    global ASSEMBLY_MODE
+    global FRAGMENTED_RECORD_THRESHOLD
+    global PACK_SPACER_LEN
+    global PACK_TARGET_SIZE
+    global GROUP_TARGET_SIZE
+    global BATCH_BOTH_STRANDS
+    global MAX_CHUNKS_PER_INFERENCE_GROUP
+
+    ASSEMBLY_MODE = env_str("ORIONGENO_ASSEMBLY_MODE", "auto")
+    FRAGMENTED_RECORD_THRESHOLD = env_int(
+        "ORIONGENO_FRAGMENTED_RECORD_THRESHOLD",
+        DEFAULT_FRAGMENTED_RECORD_THRESHOLD,
+    )
+    PACK_SPACER_LEN = env_int("ORIONGENO_PACK_SPACER_LEN", DEFAULT_PACK_SPACER_LEN)
+    PACK_TARGET_SIZE = env_int("ORIONGENO_PACK_TARGET_SIZE", DEFAULT_PACK_TARGET_SIZE)
+    GROUP_TARGET_SIZE = env_int("ORIONGENO_SEQUENCE_GROUP_SIZE", SEQUENCE_GROUP_SIZE)
+    BATCH_BOTH_STRANDS = env_bool("ORIONGENO_BATCH_BOTH_STRANDS", True)
+    MAX_CHUNKS_PER_INFERENCE_GROUP = env_int(
+        "ORIONGENO_MAX_CHUNKS_PER_INFERENCE_GROUP",
+        DEFAULT_MAX_CHUNKS_PER_INFERENCE_GROUP,
+    )
+
+
+def _env_float(name, default):
+    try:
+        return float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _resolve_auto_batch_size(requested_batch_size, model_seq_len):
+    """Resolve an explicit or automatic model-forward batch size."""
+    if not is_auto(requested_batch_size):
+        return int(requested_batch_size)
+
+    try:
+        import torch
+    except ImportError:
+        logging.warning("PyTorch is unavailable while resolving batch_size=auto; using batch_size=1.")
+        return 1
+
+    if not torch.cuda.is_available():
+        logging.info("Resolved batch_size=auto to 1 because CUDA is unavailable.")
+        return 1
+
+    fraction = _env_float("ORIONGENO_AUTO_BATCH_MEMORY_FRACTION", AUTO_BATCH_MEMORY_FRACTION)
+    fraction = min(max(fraction, 0.1), 0.95)
+    gib_per_base = _env_float("ORIONGENO_AUTO_BATCH_GIB_PER_BASE", AUTO_BATCH_GIB_PER_BASE)
+    gib_per_base = max(gib_per_base, 1e-7)
+    base_gib = _env_float("ORIONGENO_AUTO_BATCH_BASE_GIB", AUTO_BATCH_BASE_GIB)
+    max_batch = max(1, env_int("ORIONGENO_AUTO_BATCH_MAX", AUTO_BATCH_MAX))
+
+    try:
+        free_bytes, total_bytes = torch.cuda.mem_get_info()
+        free_gib = free_bytes / 1024**3
+        total_gib = total_bytes / 1024**3
+    except RuntimeError:
+        device = torch.cuda.current_device()
+        total_gib = torch.cuda.get_device_properties(device).total_memory / 1024**3
+        free_gib = total_gib
+
+    per_chunk_gib = max(model_seq_len * gib_per_base, 0.25)
+    usable_gib = max(0.0, free_gib * fraction - base_gib)
+    batch_size = int(usable_gib // per_chunk_gib)
+    batch_size = max(1, min(batch_size, max_batch))
+    logging.info(
+        "Resolved batch_size=auto to %s (free %.2f/%.2f GiB, model input length %s).",
+        batch_size,
+        free_gib,
+        total_gib,
+        model_seq_len,
+    )
+    return batch_size
+
+
+def _resolve_auto_hmm_decode_batch(requested_decode_batch, batch_size):
+    """Resolve HMM decode batch; 0 keeps legacy reuse of the model batch."""
+    if not is_auto(requested_decode_batch):
+        return int(requested_decode_batch)
+    decode_batch = max(batch_size, env_int("ORIONGENO_AUTO_HMM_DECODE_BATCH", AUTO_HMM_DECODE_BATCH))
+    logging.info("Resolved hmm_decode_batch=auto to %s.", decode_batch)
+    return decode_batch
 
 
 class PredictionContext:
@@ -68,6 +171,8 @@ class PredictionContext:
         parallel_factor,
         output_gene,
         output_repeat,
+        gene_filter_mode,
+        hmm_decode_batch=0,
     ):
         self.checkpoint_path = checkpoint_path
         self.seq_len = seq_len
@@ -79,6 +184,8 @@ class PredictionContext:
         self.parallel_factor = parallel_factor
         self.output_gene = output_gene
         self.output_repeat = output_repeat
+        self.gene_filter_mode = gene_filter_mode
+        self.hmm_decode_batch = hmm_decode_batch
 
 
 def _trim_prediction_flanks(array, flank_size):
@@ -184,8 +291,6 @@ def _predict_internal_chunks(
 
         prediction_outputs = predictor.get_prediction_outputs(
             combined_chunks,
-            hmm_filter=True,
-            clamsa_inp=None,
             output_gene=context.output_gene,
             output_repeat=context.output_repeat,
         )
@@ -231,23 +336,22 @@ def _predict_genome_records(
     coordinate_mapper,
     log_prefix="OrionGeno",
 ):
-    from .eval_model_class import PredictionGTF
+    from .prediction_annotator import PredictionAnnotator
 
     inference_seq_dict = {}
 
-    predictor = PredictionGTF(
+    predictor = PredictionAnnotator(
         model_path=context.checkpoint_path,
         seq_len=context.seq_len,
         batch_size=context.batch_size,
         hmm=USE_HMM and context.output_gene,
         temp_dir=None,
-        num_hmm=1,
-        hmm_factor=1,
         genome=genome,
         upper_only=UPPER_ONLY,
         species_name=context.species_name,
         strand="+",
         parallel_factor=context.parallel_factor,
+        hmm_decode_batch=context.hmm_decode_batch,
     )
 
     genome_fasta = predictor.init_fasta(
@@ -338,6 +442,8 @@ def _predict_genome_records(
 
                 adapted_seqlen = strand_inputs[0]["adapted_seqlen"]
                 predictor.adapt_batch_size(adapted_seqlen)
+                del x_data, coords
+
                 _predict_internal_chunks(
                     predictor,
                     strand_inputs,
@@ -347,7 +453,6 @@ def _predict_genome_records(
                     total_groups=total_groups,
                     strand_label=strand_label,
                 )
-                del x_data, coords
 
                 for item in strand_inputs:
                     strand = item["strand"]
@@ -362,11 +467,10 @@ def _predict_genome_records(
                             item["prediction_outputs"]["gene"],
                             context.flank_size,
                         )
-                        annotation, transcript_counter = predictor.create_gtf(
+                        annotation, transcript_counter = predictor.create_gene_annotation(
                             y_label=effective_labels,
                             coords=coords,
                             f_chunks=effective_chunks,
-                            clamsa_inp=None,
                             strand=strand,
                             anno=annotation,
                             tx_id=transcript_counter,
@@ -430,6 +534,7 @@ def _remove_annotation_sequences(annotation, seq_names):
 
 
 def run_prediction(args):
+    _load_runtime_env_config()
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     if getattr(args, "profile_hmm", False):
         os.environ["ORIONGENO_PROFILE_HMM"] = "1"
@@ -453,7 +558,7 @@ def run_prediction(args):
     if should_skip_by_fasta_record_count(genome_path, DEFAULT_MAX_FASTA_RECORDS):
         return
 
-    from .genome_anno import Anno
+    from .genome_annotation import Anno
 
     seq_len = args.seq_len
     flank_size = args.flank_size
@@ -464,6 +569,11 @@ def run_prediction(args):
     model_seq_len = seq_len + 2 * flank_size
     parallel_factor = _resolve_parallel_factor(args, model_seq_len, seq_len)
     check_parallel_factor(parallel_factor, model_seq_len, core_seq_len=seq_len)
+    batch_size = _resolve_auto_batch_size(args.batch_size, model_seq_len)
+    hmm_decode_batch = _resolve_auto_hmm_decode_batch(
+        getattr(args, "hmm_decode_batch", DEFAULT_HMM_DECODE_BATCH),
+        batch_size,
+    )
 
     strands = PREDICTION_STRANDS
     species_name = getattr(args, "species_name", "")
@@ -472,12 +582,14 @@ def run_prediction(args):
         seq_len=seq_len,
         flank_size=flank_size,
         model_seq_len=model_seq_len,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         strands=strands,
         species_name=species_name,
         parallel_factor=parallel_factor,
         output_gene=args.output_gene,
         output_repeat=args.output_repeat,
+        gene_filter_mode=args.gene_filter_mode,
+        hmm_decode_batch=hmm_decode_batch,
     )
 
     if species_name:
@@ -485,15 +597,21 @@ def run_prediction(args):
     logging.info("Checkpoint: %s", checkpoint_path)
     logging.info("Genome FASTA: %s", genome_path)
     if args.output_gene:
-        logging.info("Gene GTF output: %s", output_path)
+        logging.info("Gene %s output: %s", annotation_output_format(output_path), output_path)
     if args.output_repeat:
-        logging.info("Repeat GTF output: %s", repeat_output_path(output_path))
+        repeat_path = repeat_output_path(output_path)
+        logging.info("Repeat %s output: %s", annotation_output_format(repeat_path), repeat_path)
     logging.info("Output window length: %s", seq_len)
     logging.info("Flank size per side: %s", flank_size)
     logging.info("Model input length: %s", model_seq_len)
-    logging.info("Batch size: %s", args.batch_size)
+    logging.info("Batch size: %s", batch_size)
     logging.info("Strands: %s", ",".join(strands))
     logging.info("Parallel factor: %s", parallel_factor)
+    logging.info(
+        "HMM decode batch: %s",
+        context.hmm_decode_batch or f"{batch_size} (model-forward batch)",
+    )
+    logging.info("Gene filter mode: %s", args.gene_filter_mode)
     logging.info("Sequence group target size: %s", GROUP_TARGET_SIZE)
     logging.info("Use HMM: %s", USE_HMM)
     logging.info("Use uppercase sequence only: %s", UPPER_ONLY)
@@ -523,7 +641,7 @@ def run_prediction(args):
     output_seq_dict = {seq_name: len(seqrec.seq) for seq_name, seqrec in genome.items()}
     id_prefix = ""
     repeat_writer = (
-        RepeatGtfWriter(
+        RepeatGffWriter(
             output_path,
             id_prefix,
             coordinate_mapper=coordinate_mapper,
@@ -572,6 +690,7 @@ def run_prediction(args):
             output_seq_dict,
             output_path,
             id_prefix,
+            gene_filter_mode=args.gene_filter_mode,
         )
 
     if args.output_repeat:
@@ -595,7 +714,7 @@ def build_predict_parser(prog="main.py"):
         "--output",
         dest="out",
         default=env_str("ORIONGENO_OUT", ""),
-        help="Gene GTF output path. Repeat output uses the same basename with .repeat.gtf.",
+        help="Gene GFF output path. Repeat output uses the same basename with .repeat.gff.",
     )
     parser.add_argument(
         "--checkpoint",
@@ -606,22 +725,43 @@ def build_predict_parser(prog="main.py"):
         "--length",
         dest="seq_len",
         type=int,
-        default=env_int("ORIONGENO_SEQ_LEN", 512000),
+        default=env_int("ORIONGENO_SEQ_LEN", DEFAULT_SEQUENCE_LENGTH),
         help="Output window length.",
     )
     parser.add_argument(
         "--flank",
         dest="flank_size",
         type=int,
-        default=env_int("ORIONGENO_FLANK_SIZE", 0),
+        default=env_int("ORIONGENO_FLANK_SIZE", DEFAULT_FLANK_SIZE),
         help="Context bases added to each side of every output window.",
     )
-    parser.add_argument("--batch-size", type=int, default=env_int("ORIONGENO_BATCH_SIZE", 8))
+    parser.add_argument(
+        "--batch-size",
+        type=auto_positive_int,
+        default=env_auto_positive_int("ORIONGENO_BATCH_SIZE", DEFAULT_BATCH_SIZE),
+        help="Model-forward batch size. Use 'auto' to estimate from available GPU memory.",
+    )
     parser.add_argument(
         "--hmm-parallel-factor",
         type=int,
         default=env_int("ORIONGENO_HMM_PARALLEL_FACTOR", 0),
         help="Override the HMM chunk-parallel factor. Use 0 to choose it automatically.",
+    )
+    parser.add_argument(
+        "--hmm-decode-batch",
+        type=auto_nonnegative_int,
+        default=env_auto_nonnegative_int(
+            "ORIONGENO_HMM_DECODE_BATCH",
+            DEFAULT_HMM_DECODE_BATCH,
+        ),
+        help=(
+            "HMM Viterbi decode batch size, decoupled from --batch-size. Larger "
+            "values improve CPU Viterbi batch-level parallelism and amortize "
+            "per-step CUDA kernel-launch overhead on the GPU fallback path; "
+            "memory grows with the batch and a CUDA OOM is handled by halving "
+            "and retrying. Use 'auto' for a conservative tuned value; use 0 to "
+            "reuse the model-forward batch size (legacy behavior)."
+        ),
     )
     parser.add_argument(
         "--profile-hmm",
@@ -638,6 +778,18 @@ def build_predict_parser(prog="main.py"):
         "--output-repeat",
         type=str_to_bool,
         default=env_bool("ORIONGENO_OUTPUT_REPEAT", False),
+    )
+    parser.add_argument(
+        "--gene-filter-mode",
+        choices=("strict", "none"),
+        default=env_str(
+            "ORIONGENO_GENE_FILTER_MODE",
+            DEFAULT_GENE_FILTER_MODE,
+        ).lower(),
+        help=(
+            "Gene annotation filtering mode. 'strict' writes only the strict-filtered "
+            "records to --output; 'none' writes unfiltered predictions to --output."
+        ),
     )
     parser.add_argument(
         "--species-name",
