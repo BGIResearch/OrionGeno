@@ -1,12 +1,15 @@
 FROM python:3.10-slim
 
+# build-essential is required at *runtime*, not just build time: triton (via
+# mamba-ssm) JIT-compiles a small CUDA kernel wrapper with a C compiler on
+# first use.
 # Override with --build-arg APT_MIRROR=<host> for a faster build; defaults to public Debian mirrors.
 ARG APT_MIRROR=
 RUN if [ -n "$APT_MIRROR" ]; then \
         find /etc/apt -name '*.list' -o -name '*.sources' | xargs -r sed -i "s#deb.debian.org#${APT_MIRROR}#g; s#security.debian.org#${APT_MIRROR}#g"; \
     fi \
     && n=0; until [ "$n" -ge 5 ]; do \
-        timeout 300 apt-get update && timeout 300 apt-get install -y --no-install-recommends ca-certificates libgomp1 && break; \
+        timeout 300 apt-get update && timeout 300 apt-get install -y --no-install-recommends ca-certificates libgomp1 build-essential && break; \
         n=$((n+1)); echo "apt-get attempt $n failed, retrying..."; sleep 5; \
     done \
     && rm -rf /var/lib/apt/lists/*
