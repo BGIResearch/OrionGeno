@@ -40,8 +40,15 @@ An online OrionGeno API is available at [https://db.cngb.org/genomics/orion_geno
 
 - Linux
 - Python `>=3.10,<3.11`
-- NVIDIA GPU
-- NVIDIA driver with a working CUDA runtime
+- NVIDIA GPU, compute capability `>=7.0` (Volta or newer: e.g. V100, RTX
+  20/30/40-series, A100, A40, H100). The validated `torch==2.7.0+cu126`
+  wheel is compiled for `sm_50` through `sm_90`, but the `mamba-ssm`/
+  `causal-conv1d` native kernels are only tested on Turing and newer in
+  practice; older GPUs (Pascal/Maxwell) are not verified to work even
+  though the PyTorch wheel itself supports them.
+- NVIDIA driver `>=525.60.13` (Linux), for CUDA 12.x minor-version
+  compatibility. PyTorch's `+cu126` wheel bundles its own CUDA 12.6 runtime,
+  so no separate CUDA toolkit install is required on the host.
 
 #### Create and Install
 
@@ -65,7 +72,23 @@ A `Dockerfile` is provided as a ready-to-run alternative to the manual
 install above, using the same validated PyTorch, `mamba-ssm`/`causal-conv1d`,
 and `numba` versions. Model weights are **not** baked into the image;
 download them from Hugging Face or ModelScope (see Download Model Weights
-below) and mount the checkpoint directory at run time.
+below) and mount the checkpoint directory at run time. This requires a host
+meeting the Environment requirements above, plus the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+installed and configured for Docker. Confirm GPU access works before
+proceeding:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.6.3-base-ubuntu22.04 nvidia-smi
+```
+
+If that fails, install/configure the NVIDIA Container Toolkit first; it is
+not bundled with Docker itself.
+
+[.github/workflows/docker-publish.yml](.github/workflows/docker-publish.yml)
+builds and publishes an image to GHCR on every tagged release
+(`ghcr.io/bgiresearch/oriongeno`). Until the first tagged release runs,
+build locally instead:
 
 ```bash
 docker build -t oriongeno .
@@ -79,6 +102,12 @@ docker build \
   --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/ \
   --build-arg APT_MIRROR=mirrors.tuna.tsinghua.edu.cn \
   -t oriongeno .
+```
+
+Verify the image loads and the CLI runs before pointing it at real data:
+
+```bash
+docker run --rm --gpus all oriongeno --help
 ```
 
 Run gene prediction on one GPU:
@@ -108,9 +137,6 @@ docker run --rm --gpus all \
   --checkpoint /weights \
   --devices 0,1,2,3
 ```
-
-This requires a host with an NVIDIA GPU, a working NVIDIA driver, and Docker
-configured for GPU access (`docker run --gpus all ...` working).
 
 ## Download Model Weights
 
