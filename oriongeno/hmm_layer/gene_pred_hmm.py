@@ -327,9 +327,35 @@ class GenePredHMMLayer(MsaHmmLayer):
         return torch.cat(chunks, dim=-1)
 
     def viterbi(self, inputs, nucleotides, embeddings=None, end_hints=None):
-        from .Viterbi import viterbi
+        from .Viterbi import viterbi, _profile_hmm_enabled, _profile_mark, _profile_elapsed
+
+        profile = _profile_hmm_enabled()
+        total_start = _profile_mark(inputs, profile)
 
         self.cell.recurrent_init()
         stacked_inputs = self.concat_inputs(inputs, nucleotides, embeddings)
-        viterbi_seq = viterbi(stacked_inputs, self.cell, parallel_factor=self.parallel_factor)
+        if end_hints is not None:
+            # Match forward(): the public tensor is (batch, 2, states),
+            # while the emission layer expects a leading model dimension.
+            end_hints = end_hints.to(device=inputs.device, dtype=inputs.dtype).unsqueeze(0)
+        emission_start = _profile_mark(stacked_inputs, profile)
+        emission_probs = self.cell.emission_probs(
+            stacked_inputs, end_hints=end_hints, training=False
+        )
+        emission_seconds = _profile_elapsed(emission_start, emission_probs, profile)
+        viterbi_seq = viterbi(
+            stacked_inputs, self.cell, parallel_factor=self.parallel_factor,
+            end_hints=end_hints, emission_probs=emission_probs,
+        )
+        from .coding_constraints import repair_coding_paths
+        repair_start = _profile_mark(viterbi_seq, profile)
+        viterbi_seq = repair_coding_paths(
+            viterbi_seq, nucleotides, self.cell, stacked_inputs, end_hints,
+            self.num_copies, self.stop_codons, emission_probs=emission_probs,
+        )
+        if profile:
+            repair_seconds = _profile_elapsed(repair_start, viterbi_seq, profile)
+            total_seconds = _profile_elapsed(total_start, viterbi_seq, profile)
+            print(f"HMM profile (including repair): emission={emission_seconds:.3f}s "
+                  f"repair={repair_seconds:.3f}s total={total_seconds:.3f}s")
         return viterbi_seq[0] if self.num_models == 1 else viterbi_seq.permute(1, 2, 0)

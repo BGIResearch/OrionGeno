@@ -1,0 +1,2980 @@
+{
+  "cases": [
+    {
+      "cds": [
+        [
+          25,
+          42
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            25,
+            42,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            12
+          ],
+          [
+            21,
+            44
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            13,
+            20
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          12
+        ],
+        [
+          21,
+          44
+        ]
+      ],
+      "group": "plus_5utr",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "plus_five_prime_utr_intron",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t44\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t5\t44\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=2;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t5\t11\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t22\t44\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\tCDS\t25\t42\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "b0d6bd02aab49fc9b4cc58e2f13ccfe9c0796bd374916dd72954d11003be4f63",
+          "structure": {
+            "cds_with_phase": [
+              [
+                25,
+                42,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                5,
+                11
+              ],
+              [
+                22,
+                44
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                12,
+                21
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "df0b4297bf7cce676e154e1b118386e80f4abf19d6e6ca1c625bbdce527ac5d1",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            25,
+            42,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            12
+          ],
+          [
+            21,
+            44
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            13,
+            20
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t44\t.\t+\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t5\t44\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t5\t12\t.\t+\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t21\t44\t.\t+\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t5\t12\t.\t+\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t21\t24\t.\t+\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t43\t44\t.\t+\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t25\t42\t.\t+\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "3ee843d07e656df8a2a2d05cccfcf342b0869dc94ab216a122024f4e3bcc8843",
+      "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "source_fasta": ">chr_fixture\nAAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t5\t44\t.\t+\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t5\t44\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t5\t12\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t21\t44\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t25\t42\t.\t+\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "298ced0459c01fec5edf622c97ed9c7f5ec8de84c7c48898a1b1be51be821032",
+        "gff3": "d846a89eb945ec61d3c743f210b243e806356c153b908ecf86aacd47c86dd324"
+      },
+      "strand": "+",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          7,
+          24
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            7,
+            24,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            28
+          ],
+          [
+            37,
+            44
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            29,
+            36
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          28
+        ],
+        [
+          37,
+          44
+        ]
+      ],
+      "group": "plus_3utr",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "plus_three_prime_utr_intron",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t44\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t5\t44\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=2;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t5\t27\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t38\t44\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\tCDS\t7\t24\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "f63b098c746cff7a450ef0099f0671e78285ebeda234df61cc34a497921bb03e",
+          "structure": {
+            "cds_with_phase": [
+              [
+                7,
+                24,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                5,
+                27
+              ],
+              [
+                38,
+                44
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                28,
+                37
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "1d7f8ec00aaaed113a1a7c648d9434d179f8e6f0e1665f1e251ec2b3d06b77b2",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            7,
+            24,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            28
+          ],
+          [
+            37,
+            44
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            29,
+            36
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t44\t.\t+\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t5\t44\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t5\t28\t.\t+\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t37\t44\t.\t+\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t5\t6\t.\t+\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t25\t28\t.\t+\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t37\t44\t.\t+\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t7\t24\t.\t+\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "6b2705a88f71137d55f07aa9396a8556b6366ce099acba86fad06447cfc2ee8b",
+      "sequence": "AAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "source_fasta": ">chr_fixture\nAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t5\t44\t.\t+\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t5\t44\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t5\t28\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t37\t44\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t7\t24\t.\t+\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "66544d9ab00c52eb4bc42c3fbb1b5d3641526ae3c78c79ddbf7be1bfd3b476dd",
+        "gff3": "2c9b4af8209e7ce3e836965345b99a37509c4e615ae41f3ab8e94ad3d41cb935"
+      },
+      "strand": "+",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          25,
+          42
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            87,
+            104,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            85,
+            108
+          ],
+          [
+            117,
+            124
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            109,
+            116
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          12
+        ],
+        [
+          21,
+          44
+        ]
+      ],
+      "group": "minus_5utr",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "minus_five_prime_utr_intron",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t85\t124\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t85\t124\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=2;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t85\t107\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t118\t124\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\tCDS\t87\t104\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "d22323a3120cd65b53215b3509f59407d33e75376b571debcad44daac41df569",
+          "structure": {
+            "cds_with_phase": [
+              [
+                87,
+                104,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                85,
+                107
+              ],
+              [
+                118,
+                124
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                108,
+                117
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "df0b4297bf7cce676e154e1b118386e80f4abf19d6e6ca1c625bbdce527ac5d1",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            87,
+            104,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            85,
+            108
+          ],
+          [
+            117,
+            124
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            109,
+            116
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t85\t124\t.\t-\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t85\t124\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t85\t108\t.\t-\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t117\t124\t.\t-\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t85\t86\t.\t-\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t105\t108\t.\t-\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t117\t124\t.\t-\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t87\t104\t.\t-\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "b1f13fb28d89399b6d7f2435cef389dd36d378014d8c0b499562fa98facfc8b6",
+      "sequence": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGCGGCGGCCATTTTTTTTTTTTTTTTTTTTTTTTT",
+      "source_fasta": ">chr_fixture\nTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGCGGCGGCCATTTTTTTTTTTTTTTTTTTTTTTTT\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t85\t124\t.\t-\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t85\t124\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t85\t108\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t117\t124\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t87\t104\t.\t-\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "47e4cd67466185f6e0fec2db83c83e39546c9d7ac4c25942dd837aabcd547595",
+        "gff3": "b7c1c0fc14eced551947ab1c9c9e66e84a5d24c4bb9c526494e678654be1d6c8"
+      },
+      "strand": "-",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          7,
+          24
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            105,
+            122,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            85,
+            92
+          ],
+          [
+            101,
+            124
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            93,
+            100
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          28
+        ],
+        [
+          37,
+          44
+        ]
+      ],
+      "group": "minus_3utr",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "minus_three_prime_utr_intron",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t85\t124\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t85\t124\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=2;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t85\t91\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t102\t124\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\tCDS\t105\t122\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "c3bc9d1a9aa8f46dc93fc757134a988a3bd54c2fbd3cd136edcee408d5a2c4d4",
+          "structure": {
+            "cds_with_phase": [
+              [
+                105,
+                122,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                85,
+                91
+              ],
+              [
+                102,
+                124
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                92,
+                101
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "1d7f8ec00aaaed113a1a7c648d9434d179f8e6f0e1665f1e251ec2b3d06b77b2",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            105,
+            122,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            85,
+            92
+          ],
+          [
+            101,
+            124
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            93,
+            100
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t85\t124\t.\t-\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t85\t124\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t85\t92\t.\t-\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t101\t124\t.\t-\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t85\t92\t.\t-\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t101\t104\t.\t-\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t123\t124\t.\t-\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t105\t122\t.\t-\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "79b31387e7cf4b2517653ff4510036e8da807577af489daa9fda00aa9a158d5c",
+      "sequence": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGCGGCGGCCATTTTTTT",
+      "source_fasta": ">chr_fixture\nTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGCGGCGGCCATTTTTTT\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t85\t124\t.\t-\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t85\t124\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t85\t92\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t101\t124\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t105\t122\t.\t-\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "5583cbc882ef6967714c74373e0573b7508f417a8f9d449d44255f6a66935f84",
+        "gff3": "d97bd28476f44de64deb62047662093615fa6758bbe24c3051d39fec80f3f0b6"
+      },
+      "strand": "-",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          41,
+          64
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            41,
+            64,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            12
+          ],
+          [
+            21,
+            28
+          ],
+          [
+            37,
+            68
+          ],
+          [
+            77,
+            84
+          ],
+          [
+            93,
+            100
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            13,
+            20
+          ],
+          [
+            29,
+            36
+          ],
+          [
+            69,
+            76
+          ],
+          [
+            85,
+            92
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          12
+        ],
+        [
+          21,
+          28
+        ],
+        [
+          37,
+          68
+        ],
+        [
+          77,
+          84
+        ],
+        [
+          93,
+          100
+        ]
+      ],
+      "group": "multiple_utr_introns",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "multiple_utr_introns",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t100\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t5\t100\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=5;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t5\t11\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t22\t27\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t38\t67\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\texon\t78\t83\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:4\nchr_fixture\tOrionGeno\texon\t94\t100\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:5\nchr_fixture\tOrionGeno\tCDS\t41\t64\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "b15970666847e9772fa134938a59b83b002adade6f72e80765d8c12c5c223adf",
+          "structure": {
+            "cds_with_phase": [
+              [
+                41,
+                64,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                5,
+                11
+              ],
+              [
+                22,
+                27
+              ],
+              [
+                38,
+                67
+              ],
+              [
+                78,
+                83
+              ],
+              [
+                94,
+                100
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                12,
+                21
+              ],
+              [
+                28,
+                37
+              ],
+              [
+                68,
+                77
+              ],
+              [
+                84,
+                93
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "a78276cbb4250f89b341d73c6c217c6cecc08126d356f403f38042e5eef4a22e",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            41,
+            64,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            12
+          ],
+          [
+            21,
+            28
+          ],
+          [
+            37,
+            68
+          ],
+          [
+            77,
+            84
+          ],
+          [
+            93,
+            100
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            13,
+            20
+          ],
+          [
+            29,
+            36
+          ],
+          [
+            69,
+            76
+          ],
+          [
+            85,
+            92
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t100\t.\t+\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t5\t100\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t5\t12\t.\t+\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t21\t28\t.\t+\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\texon\t37\t68\t.\t+\t.\tID=t1.exon.3;Parent=t1\nchr_fixture\tOrionGeno\texon\t77\t84\t.\t+\t.\tID=t1.exon.4;Parent=t1\nchr_fixture\tOrionGeno\texon\t93\t100\t.\t+\t.\tID=t1.exon.5;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t5\t12\t.\t+\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t21\t28\t.\t+\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t37\t40\t.\t+\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t65\t68\t.\t+\t.\tID=t1.utr.4;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t77\t84\t.\t+\t.\tID=t1.utr.5;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t93\t100\t.\t+\t.\tID=t1.utr.6;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t41\t64\t.\t+\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "a154ea01daeca589f12d78776ebc2a1863f306ba264e8f435c493b20fe94a3c1",
+      "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "source_fasta": ">chr_fixture\nAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t5\t100\t.\t+\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t5\t100\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t5\t12\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t21\t28\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t37\t68\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t77\t84\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t93\t100\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t41\t64\t.\t+\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "36c9a0aaa3369d26725543dcfd2b5cd8b30bc581b729f4fa18d3fc4fe17bfbd2",
+        "gff3": "6e235f56c5f009720bf41f9097541be9f9fc7b97790671b5931a5da0dff4f365"
+      },
+      "strand": "+",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          25,
+          35
+        ],
+        [
+          44,
+          63
+        ],
+        [
+          72,
+          79
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            25,
+            35,
+            0
+          ],
+          [
+            44,
+            63,
+            1
+          ],
+          [
+            72,
+            79,
+            2
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            12
+          ],
+          [
+            21,
+            35
+          ],
+          [
+            44,
+            63
+          ],
+          [
+            72,
+            82
+          ],
+          [
+            91,
+            98
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            13,
+            20
+          ],
+          [
+            36,
+            43
+          ],
+          [
+            64,
+            71
+          ],
+          [
+            83,
+            90
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          12
+        ],
+        [
+          21,
+          35
+        ],
+        [
+          44,
+          63
+        ],
+        [
+          72,
+          82
+        ],
+        [
+          91,
+          98
+        ]
+      ],
+      "group": "cds_and_utr",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "plus_cds_and_utr_introns",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t98\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t5\t98\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=5;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t5\t11\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t22\t35\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t44\t63\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\texon\t72\t81\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:4\nchr_fixture\tOrionGeno\texon\t92\t98\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:5\nchr_fixture\tOrionGeno\tCDS\t25\t35\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\nchr_fixture\tOrionGeno\tCDS\t44\t63\t.\t+\t1\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:2\nchr_fixture\tOrionGeno\tCDS\t72\t79\t.\t+\t2\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:3\n",
+          "gff3_sha256": "9ee7fb574de696826621444eab30259d230528996c59185a6717347de79049a7",
+          "structure": {
+            "cds_with_phase": [
+              [
+                25,
+                35,
+                0
+              ],
+              [
+                44,
+                63,
+                1
+              ],
+              [
+                72,
+                79,
+                2
+              ]
+            ],
+            "exons": [
+              [
+                5,
+                11
+              ],
+              [
+                22,
+                35
+              ],
+              [
+                44,
+                63
+              ],
+              [
+                72,
+                81
+              ],
+              [
+                92,
+                98
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                12,
+                21
+              ],
+              [
+                36,
+                43
+              ],
+              [
+                64,
+                71
+              ],
+              [
+                82,
+                91
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCAAAAAAAACGCCGCCGCCGCCGCCGCCGAAAAAAAACCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        8,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        11,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        10,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        13,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "b0e8bd98887d761778cd75ba4286df778f42eeb5443e5307ef8c9a033e866523",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            25,
+            35,
+            0
+          ],
+          [
+            44,
+            63,
+            1
+          ],
+          [
+            72,
+            79,
+            2
+          ]
+        ],
+        "exons": [
+          [
+            5,
+            12
+          ],
+          [
+            21,
+            35
+          ],
+          [
+            44,
+            63
+          ],
+          [
+            72,
+            82
+          ],
+          [
+            91,
+            98
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            13,
+            20
+          ],
+          [
+            36,
+            43
+          ],
+          [
+            64,
+            71
+          ],
+          [
+            83,
+            90
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t5\t98\t.\t+\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t5\t98\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t5\t12\t.\t+\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t21\t35\t.\t+\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\texon\t44\t63\t.\t+\t.\tID=t1.exon.3;Parent=t1\nchr_fixture\tOrionGeno\texon\t72\t82\t.\t+\t.\tID=t1.exon.4;Parent=t1\nchr_fixture\tOrionGeno\texon\t91\t98\t.\t+\t.\tID=t1.exon.5;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t5\t12\t.\t+\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t21\t24\t.\t+\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t80\t82\t.\t+\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t91\t98\t.\t+\t.\tID=t1.utr.4;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t25\t35\t.\t+\t0\tID=t1.cds.1;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t44\t63\t.\t+\t1\tID=t1.cds.2;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t72\t79\t.\t+\t2\tID=t1.cds.3;Parent=t1\n",
+      "processing_gold_sha256": "6017cc5fb79aa039929cf9265e13ce958c4f9aa87b7faed327c686c6c3de6cdd",
+      "sequence": "AAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCAAAAAAAACGCCGCCGCCGCCGCCGCCGAAAAAAAACCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "source_fasta": ">chr_fixture\nAAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCAAAAAAAACGCCGCCGCCGCCGCCGCCGAAAAAAAACCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t5\t98\t.\t+\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t5\t98\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t5\t12\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t21\t35\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t44\t63\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t72\t82\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t91\t98\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t25\t35\t.\t+\t0\tParent=t1\nchr_fixture\tfixture\tCDS\t44\t63\t.\t+\t1\tParent=t1\nchr_fixture\tfixture\tCDS\t72\t79\t.\t+\t2\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "cea01e02172505c4f228aeebee0760be3410ec467e14862b7b6c85377a05dd56",
+        "gff3": "1f242bf8c60a41c9da755335980428e95c7e5be2ac5cb6d2c1766902cf68f0ab"
+      },
+      "strand": "+",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          25,
+          35
+        ],
+        [
+          44,
+          63
+        ],
+        [
+          72,
+          79
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            50,
+            57,
+            2
+          ],
+          [
+            66,
+            85,
+            1
+          ],
+          [
+            94,
+            104,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            31,
+            38
+          ],
+          [
+            47,
+            57
+          ],
+          [
+            66,
+            85
+          ],
+          [
+            94,
+            108
+          ],
+          [
+            117,
+            124
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            39,
+            46
+          ],
+          [
+            58,
+            65
+          ],
+          [
+            86,
+            93
+          ],
+          [
+            109,
+            116
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          5,
+          12
+        ],
+        [
+          21,
+          35
+        ],
+        [
+          44,
+          63
+        ],
+        [
+          72,
+          82
+        ],
+        [
+          91,
+          98
+        ]
+      ],
+      "group": "cds_and_utr",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "minus_cds_and_utr_introns",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t31\t124\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t31\t124\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=5;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t31\t37\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t48\t57\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t66\t85\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\texon\t94\t107\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:4\nchr_fixture\tOrionGeno\texon\t118\t124\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:5\nchr_fixture\tOrionGeno\tCDS\t50\t57\t.\t-\t2\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\nchr_fixture\tOrionGeno\tCDS\t66\t85\t.\t-\t1\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:2\nchr_fixture\tOrionGeno\tCDS\t94\t104\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:3\n",
+          "gff3_sha256": "7a3ac9cd42fa0c5c9974e196534c3c5474383ef63b5da515c9038032a99207d3",
+          "structure": {
+            "cds_with_phase": [
+              [
+                50,
+                57,
+                2
+              ],
+              [
+                66,
+                85,
+                1
+              ],
+              [
+                94,
+                104,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                31,
+                37
+              ],
+              [
+                48,
+                57
+              ],
+              [
+                66,
+                85
+              ],
+              [
+                94,
+                107
+              ],
+              [
+                118,
+                124
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                38,
+                47
+              ],
+              [
+                58,
+                65
+              ],
+              [
+                86,
+                93
+              ],
+              [
+                108,
+                117
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 128
+        }
+      ],
+      "length": 128,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCAAAAAAAACGCCGCCGCCGCCGCCGCCGAAAAAAAACCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        0,
+        0,
+        0,
+        0,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        8,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        11,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        10,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        13,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "oriented_state_ids_sha256": "b0e8bd98887d761778cd75ba4286df778f42eeb5443e5307ef8c9a033e866523",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            50,
+            57,
+            2
+          ],
+          [
+            66,
+            85,
+            1
+          ],
+          [
+            94,
+            104,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            31,
+            38
+          ],
+          [
+            47,
+            57
+          ],
+          [
+            66,
+            85
+          ],
+          [
+            94,
+            108
+          ],
+          [
+            117,
+            124
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            39,
+            46
+          ],
+          [
+            58,
+            65
+          ],
+          [
+            86,
+            93
+          ],
+          [
+            109,
+            116
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t31\t124\t.\t-\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t31\t124\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t31\t38\t.\t-\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t47\t57\t.\t-\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\texon\t66\t85\t.\t-\t.\tID=t1.exon.3;Parent=t1\nchr_fixture\tOrionGeno\texon\t94\t108\t.\t-\t.\tID=t1.exon.4;Parent=t1\nchr_fixture\tOrionGeno\texon\t117\t124\t.\t-\t.\tID=t1.exon.5;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t31\t38\t.\t-\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t47\t49\t.\t-\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t105\t108\t.\t-\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t117\t124\t.\t-\t.\tID=t1.utr.4;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t50\t57\t.\t-\t2\tID=t1.cds.1;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t66\t85\t.\t-\t1\tID=t1.cds.2;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t94\t104\t.\t-\t0\tID=t1.cds.3;Parent=t1\n",
+      "processing_gold_sha256": "e3b98831ece63ffc7483dcbbc9143181bd99f346bd333443370fe08ccbe3c372",
+      "sequence": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGTTTTTTTTCGGCGGCGGCGGCGGCGGCGTTTTTTTTGCGGCGGCCATTTTTTTTTTTTTTTTTTTTTTTTT",
+      "source_fasta": ">chr_fixture\nTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGTTTTTTTTCGGCGGCGGCGGCGGCGGCGTTTTTTTTGCGGCGGCCATTTTTTTTTTTTTTTTTTTTTTTTT\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t31\t124\t.\t-\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t31\t124\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t31\t38\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t47\t57\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t66\t85\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t94\t108\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t117\t124\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t50\t57\t.\t-\t2\tParent=t1\nchr_fixture\tfixture\tCDS\t66\t85\t.\t-\t1\tParent=t1\nchr_fixture\tfixture\tCDS\t94\t104\t.\t-\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "252a5ff8196b3a4618fac46d055333a27535ce81d192bfc977f79fdb5de18a63",
+        "gff3": "d46820af8d95ef5d6c3a6766ee545c31900b218d5f0dfff7db7c4cc2819bb84e"
+      },
+      "strand": "-",
+      "window_sizes": [
+        128
+      ]
+    },
+    {
+      "cds": [
+        [
+          21,
+          38
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            21,
+            38,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            1,
+            8
+          ],
+          [
+            17,
+            40
+          ],
+          [
+            49,
+            64
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            9,
+            16
+          ],
+          [
+            41,
+            48
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          1,
+          8
+        ],
+        [
+          17,
+          40
+        ],
+        [
+          49,
+          64
+        ]
+      ],
+      "group": "contig_window_edge",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "plus_contig_and_window_edges",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t7\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t18\t39\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t50\t64\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t21\t38\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "ed713fc7a6954acd131da1b807bd5954b0b2173b7a8465af3044a98746d329e6",
+          "structure": {
+            "cds_with_phase": [
+              [
+                21,
+                38,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                7
+              ],
+              [
+                18,
+                39
+              ],
+              [
+                50,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                8,
+                17
+              ],
+              [
+                40,
+                49
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 64
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t7\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t18\t39\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t50\t64\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t21\t38\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "ed713fc7a6954acd131da1b807bd5954b0b2173b7a8465af3044a98746d329e6",
+          "structure": {
+            "cds_with_phase": [
+              [
+                21,
+                38,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                7
+              ],
+              [
+                18,
+                39
+              ],
+              [
+                50,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                8,
+                17
+              ],
+              [
+                40,
+                49
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 8
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t7\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t18\t39\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t50\t64\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t21\t38\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "ed713fc7a6954acd131da1b807bd5954b0b2173b7a8465af3044a98746d329e6",
+          "structure": {
+            "cds_with_phase": [
+              [
+                21,
+                38,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                7
+              ],
+              [
+                18,
+                39
+              ],
+              [
+                50,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                8,
+                17
+              ],
+              [
+                40,
+                49
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 4
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t7\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t18\t39\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t50\t64\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t21\t38\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "ed713fc7a6954acd131da1b807bd5954b0b2173b7a8465af3044a98746d329e6",
+          "structure": {
+            "cds_with_phase": [
+              [
+                21,
+                38,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                7
+              ],
+              [
+                18,
+                39
+              ],
+              [
+                50,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                8,
+                17
+              ],
+              [
+                40,
+                49
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 2
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t+\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t+\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t7\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t18\t39\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t50\t64\t.\t+\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t21\t38\t.\t+\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "ed713fc7a6954acd131da1b807bd5954b0b2173b7a8465af3044a98746d329e6",
+          "structure": {
+            "cds_with_phase": [
+              [
+                21,
+                38,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                7
+              ],
+              [
+                18,
+                39
+              ],
+              [
+                50,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                8,
+                17
+              ],
+              [
+                40,
+                49
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 1
+        }
+      ],
+      "length": 64,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "oriented_state_ids_sha256": "e54569698ca8f65837efb7556e9813f57eac4bce6c16640d767318a8904aa540",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            21,
+            38,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            1,
+            8
+          ],
+          [
+            17,
+            40
+          ],
+          [
+            49,
+            64
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            9,
+            16
+          ],
+          [
+            41,
+            48
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t+\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t1\t8\t.\t+\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t17\t40\t.\t+\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\texon\t49\t64\t.\t+\t.\tID=t1.exon.3;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t1\t8\t.\t+\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t17\t20\t.\t+\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t39\t40\t.\t+\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t49\t64\t.\t+\t.\tID=t1.utr.4;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t21\t38\t.\t+\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "13c7cfd1aefd959eb8ff21c6eed0647c21eb9f94b9afc2c8c2f3b8b40b7129a8",
+      "sequence": "AAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "source_fasta": ">chr_fixture\nAAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t1\t64\t.\t+\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t1\t64\t.\t+\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t1\t8\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t17\t40\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\texon\t49\t64\t.\t+\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t21\t38\t.\t+\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "df948c5b103debb638ecb123f1a7325a66f86fb8ca241334e8e34fd71685cb03",
+        "gff3": "a74513c2cc333e947d1c4665ee1e595d264364b7a400a78c83bc2b44127c027a"
+      },
+      "strand": "+",
+      "window_sizes": [
+        64,
+        8,
+        4,
+        2,
+        1
+      ]
+    },
+    {
+      "cds": [
+        [
+          21,
+          38
+        ]
+      ],
+      "chrom": "chr_fixture",
+      "corrected_expected": {
+        "cds_with_phase": [
+          [
+            27,
+            44,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            1,
+            16
+          ],
+          [
+            25,
+            48
+          ],
+          [
+            57,
+            64
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            17,
+            24
+          ],
+          [
+            49,
+            56
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "exons": [
+        [
+          1,
+          8
+        ],
+        [
+          17,
+          40
+        ],
+        [
+          49,
+          64
+        ]
+      ],
+      "group": "contig_window_edge",
+      "h5_contract": {
+        "anno_dim": 30,
+        "aux_channel_count": 9,
+        "gene_label_dim": 20,
+        "repeat_annotated": 0,
+        "repeat_channel_count": 1
+      },
+      "id": "minus_contig_and_window_edges",
+      "legacy_outputs": [
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t15\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t26\t47\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t58\t64\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t27\t44\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "a523e35eb260dbe1283d3ad7472ca03dddaf6d936c5ca8e448c759d8eef4df61",
+          "structure": {
+            "cds_with_phase": [
+              [
+                27,
+                44,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                15
+              ],
+              [
+                26,
+                47
+              ],
+              [
+                58,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                16,
+                25
+              ],
+              [
+                48,
+                57
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 64
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t15\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t26\t47\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t58\t64\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t27\t44\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "a523e35eb260dbe1283d3ad7472ca03dddaf6d936c5ca8e448c759d8eef4df61",
+          "structure": {
+            "cds_with_phase": [
+              [
+                27,
+                44,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                15
+              ],
+              [
+                26,
+                47
+              ],
+              [
+                58,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                16,
+                25
+              ],
+              [
+                48,
+                57
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 8
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t15\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t26\t47\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t58\t64\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t27\t44\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "a523e35eb260dbe1283d3ad7472ca03dddaf6d936c5ca8e448c759d8eef4df61",
+          "structure": {
+            "cds_with_phase": [
+              [
+                27,
+                44,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                15
+              ],
+              [
+                26,
+                47
+              ],
+              [
+                58,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                16,
+                25
+              ],
+              [
+                48,
+                57
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 4
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t15\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t26\t47\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t58\t64\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t27\t44\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "a523e35eb260dbe1283d3ad7472ca03dddaf6d936c5ca8e448c759d8eef4df61",
+          "structure": {
+            "cds_with_phase": [
+              [
+                27,
+                44,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                15
+              ],
+              [
+                26,
+                47
+              ],
+              [
+                58,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                16,
+                25
+              ],
+              [
+                48,
+                57
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 2
+        },
+        {
+          "gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t-\t.\tID=OG_00000001;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t-\t.\tID=OG_00000001-mRNA-1;Parent=OG_00000001;StartCodon=ATG;StopCodon=TAA;Num_exons=3;geneID=OG_00000001;gene_biotype=protein_coding\nchr_fixture\tOrionGeno\texon\t1\t15\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:1\nchr_fixture\tOrionGeno\texon\t26\t47\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:2\nchr_fixture\tOrionGeno\texon\t58\t64\t.\t-\t.\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:exon:3\nchr_fixture\tOrionGeno\tCDS\t27\t44\t.\t-\t0\tParent=OG_00000001-mRNA-1;ID=OG_00000001-mRNA-1:CDS:1\n",
+          "gff3_sha256": "a523e35eb260dbe1283d3ad7472ca03dddaf6d936c5ca8e448c759d8eef4df61",
+          "structure": {
+            "cds_with_phase": [
+              [
+                27,
+                44,
+                0
+              ]
+            ],
+            "exons": [
+              [
+                1,
+                15
+              ],
+              [
+                26,
+                47
+              ],
+              [
+                58,
+                64
+              ]
+            ],
+            "gene_count": 1,
+            "introns": [
+              [
+                16,
+                25
+              ],
+              [
+                48,
+                57
+              ]
+            ],
+            "transcript_count": 1
+          },
+          "window_size": 1
+        }
+      ],
+      "length": 64,
+      "oriented_sequence": "AAAAAAAAAAAAAAAAAAAAATGGCCGCCGCCGCCTAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "oriented_state_ids": [
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        15,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        15,
+        15,
+        15,
+        7,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        6,
+        4,
+        5,
+        14,
+        16,
+        17,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        18,
+        19,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "oriented_state_ids_sha256": "e54569698ca8f65837efb7556e9813f57eac4bce6c16640d767318a8904aa540",
+      "original_structure": {
+        "cds_with_phase": [
+          [
+            27,
+            44,
+            0
+          ]
+        ],
+        "exons": [
+          [
+            1,
+            16
+          ],
+          [
+            25,
+            48
+          ],
+          [
+            57,
+            64
+          ]
+        ],
+        "gene_count": 1,
+        "introns": [
+          [
+            17,
+            24
+          ],
+          [
+            49,
+            56
+          ]
+        ],
+        "transcript_count": 1
+      },
+      "processing_gold_gff3": "##gff-version 3\nchr_fixture\tOrionGeno\tgene\t1\t64\t.\t-\t.\tID=g1;Name=g1\nchr_fixture\tOrionGeno\tmRNA\t1\t64\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tOrionGeno\texon\t1\t16\t.\t-\t.\tID=t1.exon.1;Parent=t1\nchr_fixture\tOrionGeno\texon\t25\t48\t.\t-\t.\tID=t1.exon.2;Parent=t1\nchr_fixture\tOrionGeno\texon\t57\t64\t.\t-\t.\tID=t1.exon.3;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t1\t16\t.\t-\t.\tID=t1.utr.1;Parent=t1\nchr_fixture\tOrionGeno\tthree_prime_UTR\t25\t26\t.\t-\t.\tID=t1.utr.2;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t45\t48\t.\t-\t.\tID=t1.utr.3;Parent=t1\nchr_fixture\tOrionGeno\tfive_prime_UTR\t57\t64\t.\t-\t.\tID=t1.utr.4;Parent=t1\nchr_fixture\tOrionGeno\tCDS\t27\t44\t.\t-\t0\tID=t1.cds.1;Parent=t1\n",
+      "processing_gold_sha256": "9d3d09c0dc699e6b0ba59f9ef46ad6abf4cbc7f272d64aaa56fa7c3e55f2ae72",
+      "sequence": "TTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGCGGCGGCCATTTTTTTTTTTTTTTTTTTTT",
+      "source_fasta": ">chr_fixture\nTTTTTTTTTTTTTTTTTTTTTTTTTTTTAGGCGGCGGCGGCCATTTTTTTTTTTTTTTTTTTTT\n",
+      "source_gff3": "##gff-version 3\nchr_fixture\tfixture\tgene\t1\t64\t.\t-\t.\tID=g1\nchr_fixture\tfixture\tmRNA\t1\t64\t.\t-\t.\tID=t1;Parent=g1\nchr_fixture\tfixture\texon\t1\t16\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t25\t48\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\texon\t57\t64\t.\t-\t.\tParent=t1\nchr_fixture\tfixture\tCDS\t27\t44\t.\t-\t0\tParent=t1\n",
+      "source_sha256": {
+        "fasta": "841d83613a950e1ce57657ec20c6c6661d01e8a08006e6c948bc4c94af879f18",
+        "gff3": "c262a857f43f4acffcb883d3fbfdac2922e7b16614e1e7fbe57cdc3477a3cb35"
+      },
+      "strand": "-",
+      "window_sizes": [
+        64,
+        8,
+        4,
+        2,
+        1
+      ]
+    }
+  ],
+  "fixture_payload_sha256": "f5063ffcda623c3e46c42daa890988efff030a158558697b9d7d5fb6cca254ac",
+  "provenance": {
+    "corrected_expectation": "Original input structures verified against real processing gold GFF, including CDS phases",
+    "legacy_capture": "Real PredictionAnnotator.create_gene_annotation and write_prediction_annotation from pinned original main",
+    "legacy_main_commit": "90442a2899172c7bdd2bbda19d81c8853082cdb4",
+    "legacy_main_source_sha256": {
+      "oriongeno/data_processing/window_stitching.py": "2eb445625a8060246499e8695fcbdfdf98b2ed998ab4ee665fe32fe19da6a07a",
+      "oriongeno/genome_annotation.py": "7a9fad88e35a2904d739ef6e7289590363a2632a34907ae3206ed5116982a7f4",
+      "oriongeno/prediction_annotator.py": "52c2e401fd4f2980f991be05435f1967242e742ccc2d96556d3e4491e1a0286c",
+      "oriongeno/prediction_format.py": "8d3aed2024ee9b85fe47697caf04839cfbce140741cd362014710573517c56a0"
+    },
+    "processing_commit": "73d7225543e578d0f76a35269cc384ae13878f7d",
+    "processing_source_sha256": {
+      "gene_annotation/__init__.py": "26e515cf706670f65253cc1f28ed32011c9cb9e7517380392c8bcb01f6e2d28e",
+      "gene_annotation/__main__.py": "8b6eca09e197e6deabb3e6c00dcda1719a246d4d20de57471c8164c70d14b3e5",
+      "gene_annotation/annotation_loader.py": "a1b9357d2cd75ac0e8ea06fe738f571cdf21ccd49b35b5e120d06a752fe5e9f9",
+      "gene_annotation/aux_io.py": "126306a81788791d4ed05b7a5dc791f32d6422bb7fdd45e1da507e38eb40147e",
+      "gene_annotation/batch_label_species.py": "d73e5a8e0010cf6090b0dc81a67c3ab6b16dcfa06c15b116741d972a8ef0e951",
+      "gene_annotation/build_label_h5.py": "b93da48f8fe01cbc46a87b5b4ff88862eef698b91a68104661665c38316dd32b",
+      "gene_annotation/check_aux_consistency.py": "a4864603fda2a4fd9ef00fd397778feff4ee6157d47f1279c01eb6b5ac44195d",
+      "gene_annotation/check_label_transitions.py": "71826a8123f60678da9bad29790b30fcf4ff753e40b540370790d07c1d756f9a",
+      "gene_annotation/chromosome_h5_writer.py": "3d2597d79b2eb433db4f31ad750ad883b0c0eb6ff12df1e2e5a9fd95d273a6fc",
+      "gene_annotation/h5.py": "b3cf249a530257d61dfb4bb17f84de1455446dc6e24f31689cda815d81e368b3",
+      "gene_annotation/merge_chunk_tables.py": "5a6c91ca822aff3cafcc8c32120898f4f213d1cc84dcf127150ddddff280073b",
+      "gene_annotation/output_artifacts.py": "8024153089c55752c7291905b0fd1343e3ef91074187c2f4a1fca842a5721e4c",
+      "gene_annotation/repeat_io.py": "4ce84c306de59f580868481ad6798ed21328a8364ba13d8eba5511c389a2f935",
+      "gene_annotation/run_full_pipeline.py": "0e8ab0bd53bd756618aefba5396ae93fbe8e4b8e6ab3afb446ed24222c054333",
+      "gene_annotation/runtime.py": "0b0f84b46127497f0061f5886a3bb8539c3ca2bc2a4d3bce7c9288be6732b346",
+      "gene_annotation/sample_chunks.py": "76236d5e0bd8d6c0b51163f1e98387f2c99c62ee1085753c87e32af9f1e7da65",
+      "gene_annotation/slice_h5_to_csv.py": "1b129f9782a5fafb4face5518ed2b5a3831d4b69b1ecc68f8a08190b42e52eba"
+    }
+  },
+  "schema_version": 1,
+  "scope": "Actual processing H5 truth -> main state assembly -> public GFF; no checkpoint or neural/HMM inference"
+}

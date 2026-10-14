@@ -1,11 +1,26 @@
+"""Supported loss functions for OrionGeno training and fine-tuning."""
+
 import torch
 import torch.nn.functional as F
 
 
-def compute_cross_entropy_loss(logits, labels):
-    logits = logits.contiguous().view(-1, logits.shape[-1])
-    labels = labels.view(-1)
-    return F.cross_entropy(logits, labels)
+__all__ = [
+    "compute_cross_entropy_loss",
+    "compute_focal_cross_entropy_loss",
+    "compute_weighted_token_cross_entropy_loss",
+]
+
+
+def compute_cross_entropy_loss(
+    logits: torch.Tensor,
+    labels: torch.Tensor,
+) -> torch.Tensor:
+    """Return mean token cross-entropy using PyTorch's default ignore index."""
+    flat_logits = logits.contiguous().view(-1, logits.shape[-1])
+    flat_labels = labels.reshape(-1)
+    if not torch.any(flat_labels != -100):
+        return logits.sum() * 0.0
+    return F.cross_entropy(flat_logits, flat_labels)
 
 
 def compute_weighted_token_cross_entropy_loss(
@@ -16,14 +31,15 @@ def compute_weighted_token_cross_entropy_loss(
     label_smoothing: float = 0.0,
     ignore_index: int = -100,
 ) -> torch.Tensor:
+    """Return token cross-entropy with optional class and per-token weights."""
     flat_logits = logits.contiguous().view(-1, logits.shape[-1])
-    flat_labels = labels.view(-1)
+    flat_labels = labels.reshape(-1)
     valid_mask = flat_labels != ignore_index
     flat_logits = flat_logits[valid_mask]
     flat_labels = flat_labels[valid_mask]
 
     if flat_labels.numel() == 0:
-        return torch.zeros((), device=logits.device, dtype=logits.dtype)
+        return logits.sum() * 0.0
 
     if isinstance(class_weights, list):
         class_weights = torch.tensor(class_weights, device=logits.device)
@@ -40,6 +56,12 @@ def compute_weighted_token_cross_entropy_loss(
     if token_weights is None:
         return per_token_loss.mean()
 
+    if token_weights.numel() != labels.numel():
+        raise ValueError(
+            "token_weights must contain one value per label: "
+            f"got {token_weights.numel()} weights for {labels.numel()} labels"
+        )
+
     flat_token_weights = token_weights.reshape(-1)[valid_mask].to(
         device=logits.device,
         dtype=per_token_loss.dtype,
@@ -55,14 +77,17 @@ def compute_focal_cross_entropy_loss(
     gamma: float = 2.0,
     ignore_index: int = -100,
 ) -> torch.Tensor:
+    """Return focal cross-entropy over all nonignored token labels."""
+    if gamma < 0:
+        raise ValueError(f"gamma must be nonnegative, got {gamma}")
     flat_logits = logits.contiguous().view(-1, logits.shape[-1])
-    flat_labels = labels.view(-1)
+    flat_labels = labels.reshape(-1)
     valid_mask = flat_labels != ignore_index
     flat_logits = flat_logits[valid_mask]
     flat_labels = flat_labels[valid_mask]
 
     if flat_labels.numel() == 0:
-        return torch.zeros((), device=logits.device, dtype=logits.dtype)
+        return logits.sum() * 0.0
 
     if isinstance(class_weights, list):
         class_weights = torch.tensor(class_weights, device=logits.device)

@@ -7,12 +7,12 @@ import torch.nn.functional as F
 
 def get_num_states(lengths):
     """Return the number of implicit profile-HMM states for each model length."""
-    return [2 * l + 3 for l in lengths]
+    return [2 * length + 3 for length in lengths]
 
 
 def get_num_states_implicit(lengths):
     """Return the number of explicit profile-HMM states, including silent states."""
-    return [3 * l + 5 for l in lengths]
+    return [3 * length + 5 for length in lengths]
 
 
 def inverse_softplus(features):

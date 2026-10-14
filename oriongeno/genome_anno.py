@@ -175,7 +175,7 @@ class Transcript:
 
     def find_introns(self):
         """Infer intron rows from ordered CDS or exon rows."""
-        if not 'intron' in self.transcript_lines.keys():
+        if 'intron' not in self.transcript_lines.keys():
             self.transcript_lines.update({'intron' : []})
             key = ''
             if 'CDS' in self.transcript_lines.keys():
@@ -199,7 +199,7 @@ class Transcript:
 
     def find_transcript(self):
         """Infer a transcript row from the feature span."""
-        if not 'transcript' in self.transcript_lines.keys():
+        if 'transcript' not in self.transcript_lines.keys():
             for k in self.transcript_lines.keys():
                 for line in self.transcript_lines[k]:
                     if line[3] < self.start or self.start < 0:
@@ -213,9 +213,9 @@ class Transcript:
     def find_start_stop_codon(self):
         """Infer start_codon and stop_codon rows when possible."""
 
-        if not 'start_codon' in self.transcript_lines.keys():
+        if 'start_codon' not in self.transcript_lines.keys():
             self.transcript_lines.update({'start_codon' : []})
-        if not 'stop_codon' in self.transcript_lines.keys():
+        if 'stop_codon' not in self.transcript_lines.keys():
             self.transcript_lines.update({'stop_codon' : []})
 
 
@@ -248,12 +248,12 @@ class Transcript:
                     fragmented_transcript = False
                 stop = line1
                 start = line2
-            if not 'start_codon' in self.transcript_lines.keys() and not fragmented_transcript:
+            if 'start_codon' not in self.transcript_lines.keys() and not fragmented_transcript:
                 if not fragmented_transcript:
                     self.add_line(start)
                 else:
                     self.transcript_lines.update({'start_codon' : []})
-            if not 'stop_codon' in self.transcript_lines.keys():
+            if 'stop_codon' not in self.transcript_lines.keys():
                 self.add_line(stop)
 
     def redo_phase(self):
@@ -308,13 +308,13 @@ class Transcript:
                         tx_id,
                         [f'cds_type "{cds_type}";'],
                     )
-                elif not k in ['transcript', 'gene']:
+                elif k not in ['transcript', 'gene']:
                     g[8] = format_gtf_attributes(self.gene_id, tx_id)
                 normalized = normalize_gtf_output_line(g)
                 if normalized is not None:
                     gtf.append(normalized)
 
-        if not 'exon' in self.transcript_lines.keys():
+        if 'exon' not in self.transcript_lines.keys():
             for g in [line for line in gtf if line[2] == 'CDS']:
                 exon = list(g)
                 exon[2] = 'exon'
@@ -364,7 +364,7 @@ class Anno:
             gene_id (str): Gene ID.
             transcript_id (str): Transcript ID.
         """
-        if not gene_id in self.genes.keys():
+        if gene_id not in self.genes.keys():
             self.genes.update({ gene_id : []})
         if transcript_id and transcript_id not in self.genes[gene_id]:
             self.genes[gene_id].append(transcript_id)
@@ -381,7 +381,7 @@ class Anno:
             chr (str): Chromosome or sequence name.
             strand (str): Transcript strand ("+" or "-").
         """
-        if not t_id in self.transcripts.keys():
+        if t_id not in self.transcripts.keys():
             self.transcripts.update({ t_id : Transcript(t_id, g_id, chr, self.id, strand)})
 
     def find_genes(self):

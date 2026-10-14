@@ -4,17 +4,11 @@ from functools import partial
 from typing import Optional, Tuple, Union
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 from transformers import PreTrainedModel
 from transformers.utils import ModelOutput
 
 from .configuration_orion_geno import OrionGenoConfig
-from .losses import (
-    compute_cross_entropy_loss,
-    compute_focal_cross_entropy_loss,
-    compute_weighted_token_cross_entropy_loss,
-)
 from .sequence_pyramid import (
     SequencePyramidDecoder,
     SequencePyramidEncoder,
@@ -48,48 +42,13 @@ except ImportError:
     rms_norm_fn = None
 
 
-DEFAULT_BOUNDARY_STATE_IDS = (7, 8, 9, 10, 11, 12, 13, 14, 17, 19)
-
-
 @dataclass
 class OrionGenoOutput(ModelOutput):
-    loss: Optional[torch.Tensor] = None
     logits: Optional[Tuple[torch.Tensor, ...]] = None
     gene_logits: Optional[torch.Tensor] = None
     repeat_logits: Optional[torch.Tensor] = None
     boundary_logits: Optional[torch.Tensor] = None
-    gene_cross_entropy: Optional[torch.Tensor] = None
-    repeat_cross_entropy: Optional[torch.Tensor] = None
-    boundary_focal_loss: Optional[torch.Tensor] = None
     hidden_states: Optional[torch.Tensor] = None
-
-
-def _normalize_label_tensor(labels: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
-    if labels is None:
-        return None
-    if labels.dim() == 3 and labels.shape[-1] == 1:
-        return labels.squeeze(-1).long()
-    if labels.dim() == 3:
-        return labels.argmax(dim=-1).long()
-    if labels.dim() == 2 and labels.dtype.is_floating_point:
-        return labels.long()
-    if labels.dim() > 3:
-        raise ValueError(f"Unexpected label shape: {tuple(labels.shape)}")
-    return labels.long()
-
-
-def _resolve_loss_weight(loss_weights, key: str, index: int) -> float:
-    if isinstance(loss_weights, dict):
-        return float(loss_weights.get(key, 1.0))
-    if isinstance(loss_weights, (list, tuple)) and index < len(loss_weights):
-        return float(loss_weights[index])
-    return 1.0
-
-
-def _parse_loss_settings(config: OrionGenoConfig) -> dict:
-    settings = getattr(config, "settings", {})
-    loss_settings = settings.get("loss", {})
-    return loss_settings if isinstance(loss_settings, dict) else {}
 
 
 def _require_mamba_ssm_dependencies() -> None:
@@ -481,7 +440,6 @@ class OrionGenoForJointLabeling(OrionGenoPreTrainedModel):
     def __init__(self, config: OrionGenoConfig):
         super().__init__(config)
         settings = getattr(config, "settings", {})
-        loss_settings = _parse_loss_settings(config)
         input_channels = settings.get("input_channels", 5)
         decoder_channel_sizes = settings.get(
             "decoder_channel_sizes",
@@ -502,98 +460,8 @@ class OrionGenoForJointLabeling(OrionGenoPreTrainedModel):
             self.repeat_label_count,
         )
         self.boundary_classifier = nn.Linear(decoder_output_channels, 2)
-        self.state_label_smoothing = float(loss_settings.get("state_label_smoothing", 0.02))
-        self.state_intergenic_weight = float(loss_settings.get("state_intergenic_weight", 0.1))
-        self.state_default_weight = float(loss_settings.get("state_default_weight", 1.0))
-        self.state_boundary_weight = float(loss_settings.get("state_boundary_weight", 2.5))
-        self.state_near_boundary_factor = float(
-            loss_settings.get("state_near_boundary_factor", 2.0)
-        )
-        self.state_near_boundary_distance = int(
-            loss_settings.get("state_near_boundary_distance", 16)
-        )
-        self.boundary_loss_gamma = float(loss_settings.get("boundary_loss_gamma", 2.0))
-        self.boundary_positive_weight = float(
-            loss_settings.get("boundary_positive_weight", 8.0)
-        )
-        self.intergenic_label_id = int(loss_settings.get("intergenic_label_id", 0))
-        default_boundary_state_ids = tuple(
-            boundary_state_id
-            for boundary_state_id in DEFAULT_BOUNDARY_STATE_IDS
-            if boundary_state_id < self.gene_label_count
-        )
-        boundary_state_ids = tuple(
-            int(boundary_state_id)
-            for boundary_state_id in loss_settings.get(
-                "boundary_label_ids",
-                default_boundary_state_ids,
-            )
-            if 0 <= int(boundary_state_id) < self.gene_label_count
-        )
-        state_class_weights = torch.full(
-            (self.gene_label_count,),
-            self.state_default_weight,
-            dtype=torch.float32,
-        )
-        if 0 <= self.intergenic_label_id < self.gene_label_count:
-            state_class_weights[self.intergenic_label_id] = self.state_intergenic_weight
-        for boundary_state_id in boundary_state_ids:
-            state_class_weights[boundary_state_id] = self.state_boundary_weight
-        self.register_buffer(
-            "state_class_weights",
-            state_class_weights,
-            persistent=False,
-        )
-        self.register_buffer(
-            "boundary_class_weights",
-            torch.tensor([1.0, self.boundary_positive_weight], dtype=torch.float32),
-            persistent=False,
-        )
-        self.register_buffer(
-            "boundary_state_ids",
-            torch.tensor(boundary_state_ids, dtype=torch.long),
-            persistent=False,
-        )
         self.post_init()
         self._restore_weight_tying()
-
-    def _derive_boundary_labels(
-        self,
-        gene_labels: Optional[torch.Tensor],
-    ) -> Optional[torch.Tensor]:
-        if gene_labels is None:
-            return None
-        if self.boundary_state_ids.numel() == 0:
-            return torch.zeros_like(gene_labels, dtype=torch.long)
-        return (
-            gene_labels.unsqueeze(-1) == self.boundary_state_ids.view(1, 1, -1)
-        ).any(dim=-1).long()
-
-    def _build_state_token_weights(
-        self,
-        boundary_labels: Optional[torch.Tensor],
-    ) -> Optional[torch.Tensor]:
-        if boundary_labels is None:
-            return None
-        token_weights = torch.ones_like(boundary_labels, dtype=torch.float32)
-        if (
-            self.state_near_boundary_distance <= 0
-            or self.state_near_boundary_factor <= 1.0
-        ):
-            return token_weights
-        boundary_mask = boundary_labels.to(dtype=torch.float32).unsqueeze(1)
-        expanded_boundary_mask = F.max_pool1d(
-            boundary_mask,
-            kernel_size=(self.state_near_boundary_distance * 2) + 1,
-            stride=1,
-            padding=self.state_near_boundary_distance,
-        ).squeeze(1)
-        token_weights = torch.where(
-            expanded_boundary_mask > 0,
-            token_weights * self.state_near_boundary_factor,
-            token_weights,
-        )
-        return token_weights
 
     def forward(
         self,
@@ -601,8 +469,6 @@ class OrionGenoForJointLabeling(OrionGenoPreTrainedModel):
         attention_mask: Optional[torch.Tensor] = None,
         species_embedding: Optional[torch.Tensor] = None,
         species_group_ids: Optional[torch.Tensor] = None,
-        gene_labels: Optional[torch.Tensor] = None,
-        repeat_labels: Optional[torch.Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[torch.Tensor, ...], OrionGenoOutput]:
@@ -618,9 +484,6 @@ class OrionGenoForJointLabeling(OrionGenoPreTrainedModel):
         )
         species_embedding = prepare_frozen_species_embedding(species_embedding)
         del species_group_ids
-
-        gene_labels = _normalize_label_tensor(gene_labels)
-        repeat_labels = _normalize_label_tensor(repeat_labels)
 
         sequence_features = encode_tokens_as_one_hot(
             input_ids,
@@ -640,84 +503,19 @@ class OrionGenoForJointLabeling(OrionGenoPreTrainedModel):
         repeat_logits = self.repeat_classifier(decoder_features)
         boundary_logits = self.boundary_classifier(decoder_features)
 
-        gene_cross_entropy = None
-        repeat_cross_entropy = None
-        boundary_focal_loss = None
-        total_loss = None
-        boundary_labels = self._derive_boundary_labels(gene_labels)
-
-        if gene_labels is not None:
-            gene_cross_entropy = compute_weighted_token_cross_entropy_loss(
-                gene_logits,
-                gene_labels,
-                class_weights=self.state_class_weights,
-                token_weights=self._build_state_token_weights(boundary_labels),
-                label_smoothing=self.state_label_smoothing,
-            )
-            if self.boundary_state_ids.numel() > 0 and boundary_labels is not None:
-                boundary_focal_loss = compute_focal_cross_entropy_loss(
-                    boundary_logits,
-                    boundary_labels,
-                    class_weights=self.boundary_class_weights,
-                    gamma=self.boundary_loss_gamma,
-                )
-
-        if repeat_labels is not None:
-            repeat_cross_entropy = compute_cross_entropy_loss(
-                repeat_logits,
-                repeat_labels,
-            )
-
-        if any(
-            loss_component is not None
-            for loss_component in (
-                gene_cross_entropy,
-                boundary_focal_loss,
-                repeat_cross_entropy,
-            )
-        ):
-            loss_weights = getattr(self.config, "loss_weights", None)
-            total_loss = torch.zeros((), device=input_ids.device)
-            if gene_cross_entropy is not None:
-                total_loss = total_loss + _resolve_loss_weight(
-                    loss_weights,
-                    "state_cross_entropy",
-                    0,
-                ) * gene_cross_entropy
-            if boundary_focal_loss is not None:
-                total_loss = total_loss + _resolve_loss_weight(
-                    loss_weights,
-                    "boundary_focal_loss",
-                    1,
-                ) * boundary_focal_loss
-            if repeat_cross_entropy is not None:
-                total_loss = total_loss + _resolve_loss_weight(
-                    loss_weights,
-                    "repeat_cross_entropy",
-                    2,
-                ) * repeat_cross_entropy
-
         if not return_dict:
             return (
-                total_loss,
                 gene_logits,
                 repeat_logits,
                 boundary_logits,
-                gene_cross_entropy,
-                boundary_focal_loss,
-                repeat_cross_entropy,
                 decoder_features,
                 all_hidden_states,
             )
 
         return OrionGenoOutput(
-            loss=total_loss,
             logits=(gene_logits, repeat_logits, boundary_logits),
             gene_logits=gene_logits,
             repeat_logits=repeat_logits,
             boundary_logits=boundary_logits,
-            gene_cross_entropy=gene_cross_entropy,
-            repeat_cross_entropy=repeat_cross_entropy,
-            boundary_focal_loss=boundary_focal_loss,
             hidden_states=decoder_features,
         )

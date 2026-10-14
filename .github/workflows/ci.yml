@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  OPENBLAS_NUM_THREADS: "2"
+
+jobs:
+  test:
+    name: Lint, test, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install development tools
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: python -m ruff check .
+      - name: Test without the optional GPU backend
+        run: |
+          python -c "import importlib.util; assert importlib.util.find_spec('torch') is None"
+          python -m pytest -q -ra -k 'not test_optional_real_processing_regeneration'
+      - name: Build wheel
+        run: python -m build
+      - name: Smoke-test installed wheel
+        run: |
+          python -m pip install --force-reinstall --no-deps dist/*.whl
+          cd "$RUNNER_TEMP"
+          oriongeno --version
+          oriongeno --help
+          oriongeno multi --help
+          oriongeno multi-node --help
+  core:
+    name: Core inference regressions (CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CUDA_VISIBLE_DEVICES: ""
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      NUMBA_NUM_THREADS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install CPU inference dependencies
+        run: |
+          python -m pip download --no-deps torch==2.7.0 --index-url https://download.pytorch.org/whl/cpu --dest "$RUNNER_TEMP/torch-cpu"
+          python -m pip install "$RUNNER_TEMP"/torch-cpu/torch-*.whl -e ".[dev,performance]"
+          python -m pip check
+          python -c "import torch, numba; assert torch.version.cuda is None"
+      - name: Run inference, decoding, and scheduling regressions
+        run: |
+          python -m pytest -q -ra --junitxml=core-tests.xml -k 'not test_optional_real_processing_regeneration'
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          cases = list(ET.parse("core-tests.xml").iter("testcase"))
+          if not cases or any(case.find("skipped") is not None for case in cases):
+              raise SystemExit("Core regressions must execute without skips")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-test-report
+          path: core-tests.xml

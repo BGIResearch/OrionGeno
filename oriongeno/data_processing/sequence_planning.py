@@ -110,6 +110,12 @@ def _sequence_group_cost(seq_len, core_chunk_size, flank_size=0):
     return window_count * model_chunk_size
 
 
+def sequence_window_cost(seq_len, chunk_size, flank_size=0, parallel_factor=1, strands=2):
+    """Estimate processed bases, including adaptive padding, flanks and strands."""
+    core = adapted_core_chunk_size(seq_len, chunk_size, parallel_factor)
+    return int(strands) * _sequence_group_cost(seq_len, core, flank_size)
+
+
 def group_sequences(
     seq_names,
     seq_lens,

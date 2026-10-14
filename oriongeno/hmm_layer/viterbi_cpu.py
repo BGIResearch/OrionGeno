@@ -78,8 +78,10 @@ def _viterbi_one(emit, log_A, init, out):
                     best_from = fr
             dp_next[to] = best_val + _safe_log_scalar(emit[i, to])
             backptr[i, to] = best_from
+        # A common offset preserves argmax paths and float32 precision.
+        offset = np.max(dp_next)
         for s in range(q):
-            dp[s] = dp_next[s]
+            dp[s] = dp_next[s] - offset
 
     # Terminate: best final state (first max on tie).
     best_state = 0
@@ -96,7 +98,7 @@ def _viterbi_one(emit, log_A, init, out):
         out[i - 1] = best_state
 
 
-@njit(cache=True, parallel=True, fastmath=False)
+@njit(cache=True, parallel=True, fastmath=False, nogil=True)
 def _viterbi_batch(emit, log_A, init, out):
     """Decode a batch of sequences, one prange iteration per sequence.
 

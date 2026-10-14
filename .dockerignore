@@ -18,4 +18,12 @@ __pycache__
 wheels
 *.egg-info
 .pytest_cache
+build
+dist
+output
+outputs
+results
+work
+checkpoints
+.venv
 .DS_Store

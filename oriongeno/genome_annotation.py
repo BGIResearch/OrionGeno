@@ -1,11 +1,19 @@
 """Annotation data structures and GTF/GFF3 serialization helpers."""
 
 import sys
-import csv
-from urllib.parse import quote
+from urllib.parse import unquote
 
-GTF_GENE_ID = "gene_id"
-GTF_TRANSCRIPT_ID = "transcript_id"
+from .annotation_io import (
+    GTF_GENE_ID,
+    GTF_TRANSCRIPT_ID,
+    format_gff3_attributes,
+    format_parsed_gff3_attributes,
+    format_gtf_attributes,
+    open_annotation_text,
+    parse_attributes as parse_gtf_attributes,
+    split_attributes,
+)
+
 GTF_OUTPUT_FEATURE_MAP = {
     "5UTR": "five_prime_UTR",
     "3UTR": "three_prime_UTR",
@@ -13,7 +21,6 @@ GTF_OUTPUT_FEATURE_MAP = {
 GTF_OUTPUT_SKIP_FEATURES = {"intron"}
 GTF_FRAME_FEATURES = {"CDS", "start_codon", "stop_codon"}
 GFF3_TRANSCRIPT_FEATURE = "mRNA"
-GFF3_ATTRIBUTE_SAFE = ":._+-"
 GFF3_CHILD_FEATURE_SUFFIX = {
     "exon": "exon",
     "CDS": "cds",
@@ -36,60 +43,8 @@ def normalize_gtf_output_line(line):
     return normalized
 
 
-def parse_gtf_attributes(attributes):
-    """Parse GTF/GFF-style attributes into a dictionary.
-
-    The annotation object stores plain internal IDs, while GTF output needs a
-    structured ninth column. This parser keeps both forms explicit and also
-    accepts bare IDs as a caller-provided fallback.
-    """
-    parsed = {}
-    for item in str(attributes).strip().rstrip(";").split(";"):
-        item = item.strip()
-        if not item:
-            continue
-        if "=" in item and " " not in item.split("=", 1)[0]:
-            key, value = item.split("=", 1)
-        else:
-            parts = item.split(None, 1)
-            if len(parts) != 2:
-                continue
-            key, value = parts
-        parsed[key.strip()] = value.strip().strip('"')
-    return parsed
-
-
 def get_gtf_attribute(attributes, key, default=""):
     return parse_gtf_attributes(attributes).get(key, default)
-
-
-def format_gtf_attributes(gene_id="", transcript_id="", extra_attributes=None):
-    parts = []
-    if gene_id:
-        parts.append(f'{GTF_GENE_ID} "{gene_id}";')
-    if transcript_id:
-        parts.append(f'{GTF_TRANSCRIPT_ID} "{transcript_id}";')
-    if extra_attributes:
-        parts.extend(str(attr).strip() for attr in extra_attributes if str(attr).strip())
-    return " ".join(parts)
-
-
-def _gff3_escape(value):
-    return quote(str(value), safe=GFF3_ATTRIBUTE_SAFE)
-
-
-def format_gff3_attributes(items):
-    parts = []
-    for key, value in items:
-        if value in (None, ""):
-            continue
-        if isinstance(value, (list, tuple)):
-            rendered = ",".join(_gff3_escape(item) for item in value if str(item))
-        else:
-            rendered = _gff3_escape(value)
-        if rendered:
-            parts.append(f"{key}={rendered}")
-    return ";".join(parts) if parts else "."
 
 
 def _gff3_child_id(parent_id, feature, index):
@@ -108,6 +63,11 @@ def gtf_rows_to_gff3_rows(rows):
 
         feature = fields[2]
         parsed = parse_gtf_attributes(fields[8])
+        tokens = split_attributes(fields[8])
+        if tokens and tokens[0].separator == "=":
+            fields[8] = format_parsed_gff3_attributes(parsed.items())
+            yield fields
+            continue
         attrs = []
 
         if feature == "gene":
@@ -158,8 +118,50 @@ def gtf_rows_to_gff3_rows(rows):
         yield fields
 
 
+def gff3_rows_to_gtf_rows(rows):
+    """Convert predictor gene/mRNA/child rows, retaining GTF input as GTF."""
+    transcript_genes = {}
+    converted = []
+    codon_groups = {}
+    for row in rows:
+        fields = [str(item) for item in row]
+        parsed = parse_gtf_attributes(fields[8])
+        tokens = split_attributes(fields[8])
+        if not tokens or tokens[0].separator != "=":
+            converted.append(fields)
+            continue
+        feature_id = unquote(parsed.pop("ID", ""))
+        parents = [unquote(parent) for parent in parsed.pop("Parent", "").split(",") if parent]
+        if len(parents) > 1:
+            raise ValueError("Prediction GTF export requires a single parent per feature")
+        parent = parents[0] if parents else ""
+        feature = fields[2]
+        if feature == "gene":
+            gene_id, transcript_id = feature_id, ""
+        elif feature in {"mRNA", "transcript"}:
+            gene_id, transcript_id = parent, feature_id
+            transcript_genes[transcript_id] = gene_id
+            fields[2] = "transcript"
+        else:
+            transcript_id = parent
+            gene_id = transcript_genes.get(parent, "")
+        extras = [f'{key} "{unquote(value)}";' for key, value in parsed.items()
+                  if key not in {GTF_GENE_ID, GTF_TRANSCRIPT_ID}]
+        fields[8] = format_gtf_attributes(gene_id, transcript_id, extras)
+        if feature in {"start_codon", "stop_codon"}:
+            codon_groups.setdefault((transcript_id, feature), []).append(fields)
+        converted.append(fields)
+    # Recover phases for codons split across exons, in transcript direction.
+    for codon in codon_groups.values():
+        consumed = 0
+        for fields in sorted(codon, key=lambda line: int(line[3]), reverse=codon[0][6] == "-"):
+            fields[7] = str((-consumed) % 3)
+            consumed += int(fields[4]) - int(fields[3]) + 1
+    yield from converted
+
+
 def write_gff3_rows(rows, out_path):
-    with open(out_path, "w", encoding="utf-8") as file_obj:
+    with open_annotation_text(out_path, "w") as file_obj:
         file_obj.write("##gff-version 3\n")
         for fields in gtf_rows_to_gff3_rows(rows):
             file_obj.write("\t".join(map(str, fields)) + "\n")
@@ -259,12 +261,40 @@ class Transcript:
         Returns:
             bool: False if no CDS or exon rows were found, otherwise True.
         """
-        self.find_introns()
+        self.find_exons()
         if not self.check_cds_exons():
             return False
+        self.find_introns()
         self.find_transcript()
         self.find_start_stop_codon()
         return True
+
+    def _inferred_exon_lines(self):
+        """Union adjacent CDS/UTR intervals into complete transcript exons."""
+        pieces = sorted(
+            (
+                list(line)
+                for feature in ("CDS", "5UTR", "3UTR", "five_prime_UTR", "three_prime_UTR")
+                for line in self.transcript_lines.get(feature, [])
+            ),
+            key=lambda line: (line[3], line[4]),
+        )
+        exons = []
+        for line in pieces:
+            if exons and line[3] <= exons[-1][4] + 1:
+                exons[-1][4] = max(exons[-1][4], line[4])
+                continue
+            line[2] = "exon"
+            line[7] = "."
+            line[8] = format_gtf_attributes(self.gene_id, self.id)
+            exons.append(line)
+        return exons
+
+    def find_exons(self):
+        """Fill absent exons from CDS and UTR without changing either feature."""
+        if not self.transcript_lines.get("exon"):
+            for line in self._inferred_exon_lines():
+                self.add_line(line)
 
     def check_cds_exons(self):
         """Return True when the transcript has CDS or exon features."""
@@ -275,19 +305,21 @@ class Transcript:
 
     def find_introns(self):
         """Infer intron rows from ordered CDS or exon rows."""
-        if not 'intron' in self.transcript_lines.keys():
+        if 'intron' not in self.transcript_lines:
             self.transcript_lines.update({'intron' : []})
             key = ''
-            if 'CDS' in self.transcript_lines.keys():
-                key = 'CDS'
-            elif 'exon' in self.transcript_lines.keys():
+            if self.transcript_lines.get('exon'):
                 key = 'exon'
+            elif self.transcript_lines.get('CDS'):
+                key = 'CDS'
             if key:
                 exon_lst = []
                 for line in self.transcript_lines[key]:
                     exon_lst.append(line)
                 exon_lst = sorted(exon_lst, key=lambda e:e[3])
                 for i in range(1, len(exon_lst)):
+                    if exon_lst[i][3] <= exon_lst[i-1][4] + 1:
+                        continue
                     intron = []
                     intron += exon_lst[i][0:2]
                     intron.append('intron')
@@ -299,7 +331,7 @@ class Transcript:
 
     def find_transcript(self):
         """Infer a transcript row from the feature span."""
-        if not 'transcript' in self.transcript_lines.keys():
+        if 'transcript' not in self.transcript_lines:
             if not any(self.transcript_lines.values()):
                 return
             for k in self.transcript_lines.keys():
@@ -313,54 +345,46 @@ class Transcript:
             self.add_line(tx_line)
 
     def find_start_stop_codon(self):
-        """Infer start_codon and stop_codon rows when possible."""
-        key = "CDS" if "CDS" in self.transcript_lines else "exon"
-        if key not in self.transcript_lines or not self.transcript_lines[key]:
+        """Infer terminal codon intervals along the spliced CDS, on either strand.
+
+        These positional features are not an independent sequence-level QC.
+        Incomplete codons and exon-only models do not acquire codon rows.
+        """
+        cds = sorted(
+            self.transcript_lines.get("CDS", []),
+            key=lambda line: (line[3], line[4]),
+            reverse=self.strand == "-",
+        )
+        if not cds:
             return
-
-        self.transcript_lines[key].sort(key=lambda line: line[3])
-        first_feature = self.transcript_lines[key][0]
-        last_feature = self.transcript_lines[key][-1]
-        low_codon = [
-            self.chr,
-            first_feature[1],
-            "",
-            first_feature[3],
-            first_feature[3] + 2,
-            ".",
-            self.strand,
-            "0",
-            format_gtf_attributes(self.gene_id, self.id),
-        ]
-        high_codon = [
-            self.chr,
-            last_feature[1],
-            "",
-            last_feature[4] - 2,
-            last_feature[4],
-            ".",
-            self.strand,
-            "0",
-            format_gtf_attributes(self.gene_id, self.id),
-        ]
-
-        if self.strand == "+":
-            low_codon[2] = "start_codon"
-            high_codon[2] = "stop_codon"
-            start = low_codon
-            stop = high_codon
-            has_complete_start = str(first_feature[7]) == "0"
-        else:
-            low_codon[2] = "stop_codon"
-            high_codon[2] = "start_codon"
-            stop = low_codon
-            start = high_codon
-            has_complete_start = str(last_feature[7]) == "0"
-
-        if not self.transcript_lines.get("start_codon") and has_complete_start:
-            self.add_line(start)
-        if not self.transcript_lines.get("stop_codon"):
-            self.add_line(stop)
+        total = sum(line[4] - line[3] + 1 for line in cds)
+        if total < 3:
+            return
+        first_phase = str(cds[0][7])
+        codons = []
+        if first_phase == "0":
+            codons.append(("start_codon", 0, 3))
+        if first_phase in {"0", "1", "2"} and (total - int(first_phase)) % 3 == 0:
+            codons.append(("stop_codon", total - 3, total))
+        for feature, begin, end in codons:
+            if self.transcript_lines.get(feature):
+                continue
+            offset = 0
+            consumed = 0
+            for segment in cds:
+                length = segment[4] - segment[3] + 1
+                left, right = max(begin, offset), min(end, offset + length)
+                if left < right:
+                    line = list(segment)
+                    line[2], line[5], line[7] = feature, ".", str((-consumed) % 3)
+                    if self.strand == "-":
+                        line[3], line[4] = segment[4] - (right - offset) + 1, segment[4] - (left - offset)
+                    else:
+                        line[3], line[4] = segment[3] + left - offset, segment[3] + right - offset - 1
+                    line[8] = format_gtf_attributes(self.gene_id, self.id)
+                    self.add_line(line)
+                    consumed += right - left
+                offset += length
 
     def redo_phase(self):
         if 'CDS' in self.transcript_lines:
@@ -373,6 +397,8 @@ class Transcript:
 
     def check_splits(self):
         for k in self.transcript_lines.keys():
+            if not self.transcript_lines[k]:
+                continue
             self.transcript_lines[k] = sorted(self.transcript_lines[k],
                                               key=lambda x: x[3])
             new_list = [self.transcript_lines[k][0]]
@@ -394,12 +420,17 @@ class Transcript:
             prefix += '.'
         tx_line = []
         tx_id = prefix + self.id
+        coding = bool(self.transcript_lines.get('CDS'))
         for k in self.transcript_lines.keys():
-            for i, raw_line in enumerate(self.transcript_lines[k]):
+            lines = sorted(self.transcript_lines[k], key=lambda line: (line[3], line[4]))
+            for i, raw_line in enumerate(lines):
                 g = list(raw_line)
                 if k == 'transcript':
                     tx_line  = g
-                    tx_line[8] = format_gtf_attributes(self.gene_id, tx_id)
+                    tx_line[8] = format_gtf_attributes(
+                        self.gene_id, tx_id,
+                        ['transcript_biotype "protein_coding";'] if coding else None,
+                    )
                     continue
                 elif k == 'CDS':
                     cds_type = 'internal'
@@ -414,23 +445,22 @@ class Transcript:
                         tx_id,
                         [f'cds_type "{cds_type}";'],
                     )
-                elif not k in ['transcript', 'gene']:
+                elif k not in ['transcript', 'gene']:
                     g[8] = format_gtf_attributes(self.gene_id, tx_id)
                 normalized = normalize_gtf_output_line(g)
                 if normalized is not None:
                     gtf.append(normalized)
 
-        if not 'exon' in self.transcript_lines.keys():
-            for g in [line for line in gtf if line[2] == 'CDS']:
-                exon = list(g)
-                exon[2] = 'exon'
-                exon[7] = "."
+        if not self.transcript_lines.get('exon'):
+            for exon in self._inferred_exon_lines():
                 exon[8] = format_gtf_attributes(self.gene_id, tx_id)
                 normalized_exon = normalize_gtf_output_line(exon)
                 if normalized_exon is not None:
                     gtf.append(normalized_exon)
 
-        gtf = sorted(gtf, key=lambda g: (g[3],g[4]))
+        feature_order = {"exon": 0, "five_prime_UTR": 1, "CDS": 2,
+                         "three_prime_UTR": 3, "start_codon": 4, "stop_codon": 5}
+        gtf = sorted(gtf, key=lambda g: (g[3], feature_order.get(g[2], 6), g[4], g[2]))
         if tx_line:
             normalized_tx = normalize_gtf_output_line(tx_line)
             if normalized_tx is not None:
@@ -470,7 +500,7 @@ class Anno:
             gene_id (str): Gene ID.
             transcript_id (str): Transcript ID.
         """
-        if not gene_id in self.genes.keys():
+        if gene_id not in self.genes:
             self.genes.update({ gene_id : []})
         if transcript_id and transcript_id not in self.genes[gene_id]:
             self.genes[gene_id].append(transcript_id)
@@ -487,7 +517,7 @@ class Anno:
             chr (str): Chromosome or sequence name.
             strand (str): Transcript strand ("+" or "-").
         """
-        if not t_id in self.transcripts.keys():
+        if t_id not in self.transcripts:
             self.transcripts.update({ t_id : Transcript(t_id, g_id, chr, self.id, strand)})
 
     def find_genes(self):
@@ -521,7 +551,10 @@ class Anno:
         for gene in gene_gtf:
             gene_id = gene[8]
             gene_line = list(gene)
-            gene_line[8] = format_gtf_attributes(gene_id)
+            coding = any(self.transcripts[tx].transcript_lines.get('CDS') for tx in self.genes[gene_id])
+            gene_line[8] = format_gtf_attributes(
+                gene_id, extra_attributes=['gene_biotype "protein_coding";'] if coding else None,
+            )
             normalized_gene = normalize_gtf_output_line(gene_line)
             if normalized_gene is not None:
                 gtf.append(normalized_gene)
@@ -554,7 +587,7 @@ class Anno:
         """
         self.translation_tab = []
         gene_numb = 1
-        old_gene_gtf = sorted(self.gene_gtf.values(), key=lambda g: (g[0],g[3],g[4]))
+        old_gene_gtf = sorted(self.gene_gtf.values(), key=lambda g: (g[0],g[3],g[4],g[6]))
         self.gene_gtf = {}
         old_genes = self.genes
         self.genes = {}
@@ -569,7 +602,11 @@ class Anno:
             gene[8] = new_gene_id
             self.genes.update({new_gene_id : []})
             self.gene_gtf.update({new_gene_id : gene})
-            for old_tx_id in old_genes[old_gene_id]:
+            for old_tx_id in sorted(
+                old_genes[old_gene_id],
+                key=lambda tx_id: (old_txs[tx_id].start, old_txs[tx_id].end,
+                                   old_txs[tx_id].get_type_coords('CDS', False)),
+            ):
                 new_tx_id = "{}g{}.t{}".format(prefix, gene_numb, tx_numb)
                 self.transcripts.update({new_tx_id : old_txs[old_tx_id]})
                 self.transcripts[new_tx_id].id = new_tx_id
@@ -586,10 +623,9 @@ class Anno:
         Args:
             out_path (str): Output GTF path.
         """
-        with open(out_path, 'w+') as file:
-            out_writer = csv.writer(file, delimiter='\t', quotechar = "|", lineterminator = '\n')
+        with open_annotation_text(out_path, 'w') as file:
             for line in self.get_gtf():
-                out_writer.writerow(line)
+                file.write('\t'.join(map(str, line)) + '\n')
 
     def write_gff3(self, out_path):
         """Write the annotation to a tab-delimited GFF3 file."""

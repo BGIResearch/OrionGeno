@@ -1,17 +1,68 @@
 # Advancing ab initio gene annotation with OrionGeno
 
 <p align="center">
-  <strong>OrionGeno takes a genome FASTA and produces gene annotations in GTF format.</strong>
+  <strong>OrionGeno takes a genome FASTA and produces gene annotations in GFF3 or GTF format.</strong>
 </p>
 
 <p align="center">
+  <img alt="OrionGeno V1.0.2" src="https://img.shields.io/badge/Version-1.0.2-0a7f5a?style=flat-square">
   <a href="https://db.cngb.org/genomics/orion_geno"><img alt="Online API" src="https://img.shields.io/badge/Online%20API-CNGBdb-0ea5e9?style=flat-square&logo=fastapi&logoColor=white"></a>
   <a href="https://huggingface.co/BGI-Research/OrionGeno"><img alt="Hugging Face model weights" src="https://img.shields.io/badge/Model%20Weights-Hugging%20Face-ffcc4d?style=flat-square&logo=huggingface&logoColor=black"></a>
   <a href="https://modelscope.cn/models/BGI-Research/OrionGeno/files"><img alt="ModelScope model weights" src="https://img.shields.io/badge/ModelScope-Weights-6246ea?style=flat-square"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white">
-  <img alt="Outputs" src="https://img.shields.io/badge/Outputs-Gene%20GTF%20%7C%20Repeat%20GTF-0a7f5a?style=flat-square">
+  <img alt="Outputs" src="https://img.shields.io/badge/Outputs-GFF3%20%7C%20GTF%20%7C%20Repeats-0a7f5a?style=flat-square">
   <img alt="License" src="https://img.shields.io/badge/License-Non--Commercial-b45309?style=flat-square">
 </p>
+
+<p align="center">
+  <img src="docs/figures/benchmark-overview.svg" alt="Mean precision and sensitivity across 20 species" width="980">
+</p>
+
+<p align="center">
+  <sub>Mean precision and sensitivity across 20 species at gene, CDS chain, and transcript levels. <a href="docs/figures/benchmark-overview.svg">SVG</a></sub>
+</p>
+
+## What OrionGeno Does
+
+OrionGeno is a deep learning-based *ab initio* model for eukaryotic gene annotation. It takes FASTA-formatted genomic sequences as input and generates GFF3 or GTF annotations for gene structures, including exons, introns, UTRs, and optional repeat regions. Powered by a phylogeny-aware architecture, it achieves state-of-the-art accuracy across diverse lineages, including Vertebrates, Invertebrates, Viridiplantae, and Fungi.
+
+## Online API
+
+An online OrionGeno API is available at [https://db.cngb.org/genomics/orion_geno](https://db.cngb.org/genomics/orion_geno). We welcome researchers to test the service and share feedback. The API will be updated continuously as additional curated species annotations become available.
+
+## Benchmark
+
+[Benchmark results](docs/benchmark.md): 20 species, with gene, CDS chain, and
+transcript accuracy, runtime, and checkpoint details.
+
+**Benchmark hardware:** 32 CPU threads + 2 × NVIDIA RTX 4090 D GPUs.
+
+<details>
+<summary>Gene-level results for all 20 species</summary>
+
+![Gene-level precision and sensitivity across 20 species](docs/figures/benchmark-gene-by-species.svg)
+
+</details>
+
+<details>
+<summary>CDS chain-level results for all 20 species</summary>
+
+![CDS chain-level precision and sensitivity across 20 species](docs/figures/benchmark-cds-by-species.svg)
+
+</details>
+
+<details>
+<summary>Transcript-level results for all 20 species</summary>
+
+![Transcript-level precision and sensitivity across 20 species](docs/figures/benchmark-transcript-by-species.svg)
+
+</details>
+
+<details>
+<summary>V1.0.1 gene and protein benchmark</summary>
+
+- [Gene benchmark](docs/benchmark/gene_benchmark.md)
+- [Protein benchmark](docs/benchmark/protein_benchmark.md)
 
 <p align="center">
   <img src="docs/img/Fig2.png" alt="Protein benchmark summary" width="980">
@@ -21,18 +72,7 @@
   <sub>Figure 2. Mean protein-level F1 across the tested models at coverage thresholds from 0.6 to 1.0. <a href="docs/img/Fig2.png">HD</a></sub>
 </p>
 
-## What OrionGeno Does
-
-OrionGeno is a deep learning-based *ab initio* model for eukaryotic gene annotation. It takes FASTA-formatted genomic sequences as input and generates GTF annotations for gene structures, including exons, introns, UTRs, and optional repeat regions. Powered by a phylogeny-aware architecture, it achieves state-of-the-art accuracy across diverse lineages, including Vertebrates, Invertebrates, Viridiplantae, and Fungi.
-
-## Online API
-
-An online OrionGeno API is available at [https://db.cngb.org/genomics/orion_geno](https://db.cngb.org/genomics/orion_geno). We welcome researchers to test the service and share feedback. The API will be updated continuously as additional curated species annotations become available.
-
-## Benchmark
-
-- [Gene benchmark](docs/benchmark/gene_benchmark.md)
-- [Protein benchmark](docs/benchmark/protein_benchmark.md)
+</details>
 
 ## Installation
 
@@ -65,6 +105,15 @@ That guide keeps package caches, temporary files, native extension builds, and
 downloaded wheels inside the repository directory, and documents the tested
 Python 3.10, PyTorch 2.7.0, CUDA 12.x, `mamba-ssm`, and `causal-conv1d`
 installation path.
+
+Install the Python package after its inference dependencies:
+
+```bash
+python -m pip install .
+oriongeno --version
+```
+
+The version command prints `1.0.2`.
 
 #### Docker
 
@@ -114,7 +163,7 @@ Run gene prediction on one GPU:
 
 ```bash
 docker run --rm --gpus all \
-  -v /path/to/oriongeno-weights/oriongeno_mammals:/weights:ro \
+  -v /path/to/oriongeno-weights/checkpoints/oriongeno_mammals:/weights:ro \
   -v /path/to/genome.fna:/data/genome.fna:ro \
   -v /path/to/output:/data/out \
   oriongeno \
@@ -127,7 +176,7 @@ Run gene prediction on multiple GPUs:
 
 ```bash
 docker run --rm --gpus all \
-  -v /path/to/oriongeno-weights/oriongeno_mammals:/weights:ro \
+  -v /path/to/oriongeno-weights/checkpoints/oriongeno_mammals:/weights:ro \
   -v /path/to/genome.fna:/data/genome.fna:ro \
   -v /path/to/output:/data/out \
   oriongeno \
@@ -164,8 +213,10 @@ To improve gene structure prediction accuracy across diverse species, OrionGeno 
 For example:
 
 ```text
-/path/to/oriongeno-weights/oriongeno_mammals/
+/path/to/oriongeno-weights/checkpoints/oriongeno_mammals/
 ```
+
+Pass the directory containing `config.json` and the model weight files.
 
 ## Quick Start
 
@@ -175,7 +226,7 @@ Three filesystem paths are required:
 
 - checkpoint directory downloaded from Hugging Face or ModelScope
 - genome FASTA input
-- output GTF path
+- output GFF3 or GTF path
 
 Specifying `--species-name` is optional. It is used only for species conditioning inside the selected checkpoint; it does not select or validate a checkpoint directory.
 
@@ -187,10 +238,11 @@ Run gene prediction on one GPU:
 python main.py \
   --genome /path/to/genome.fna \
   --output /path/to/output/oriongeno.gtf \
-  --checkpoint /path/to/oriongeno-weights/oriongeno_mammals \
-  --length 512000 \
-  --flank 64000 \
-  --batch-size 8 \
+  --checkpoint /path/to/oriongeno-weights/checkpoints/oriongeno_mammals \
+  --length 640000 \
+  --flank 40000 \
+  --batch-size auto \
+  --hmm-decode-batch auto \
   --output-gene True \
   --output-repeat False \
   --species-name Homo_sapiens
@@ -202,11 +254,12 @@ Run gene prediction on multiple GPUs:
 python main.py multi \
   --genome /path/to/genome.fna \
   --output /path/to/output/oriongeno.gtf \
-  --checkpoint /path/to/oriongeno-weights/oriongeno_mammals \
-  --devices 0,1,2,3 \
-  --length 512000 \
-  --flank 64000 \
-  --batch-size 8 \
+  --checkpoint /path/to/oriongeno-weights/checkpoints/oriongeno_mammals \
+  --devices 0,1 \
+  --length 640000 \
+  --flank 40000 \
+  --batch-size auto \
+  --hmm-decode-batch auto \
   --output-gene True \
   --output-repeat False \
   --species-name Homo_sapiens
@@ -218,17 +271,20 @@ Run without species conditioning:
 python main.py \
   --genome /path/to/genome.fna \
   --output /path/to/output/oriongeno.gtf \
-  --checkpoint /path/to/oriongeno-weights/oriongeno_mammals \
-  --length 512000 \
-  --flank 64000 \
-  --batch-size 8 \
+  --checkpoint /path/to/oriongeno-weights/checkpoints/oriongeno_mammals \
+  --length 640000 \
+  --flank 40000 \
+  --batch-size auto \
+  --hmm-decode-batch auto \
   --output-gene True \
   --output-repeat False
 ```
 
-Recommended batch sizes:
+In V1.0.2, `--batch-size auto` and `--hmm-decode-batch auto` size the neural
+model and HMM batches independently. The values below can also be used as
+manual starting points:
 
-| GPU      | Recommended batch size |
+| GPU      | Manual batch size      |
 |:-------- |:---------------------- |
 | RTX 4090 | `4`                    |
 | A40      | `8`                    |
@@ -246,17 +302,7 @@ Gene annotations are written directly to the file path specified by `--output` w
 /path/to/output/oriongeno.gtf
 ```
 
-The gene GTF may include:
-
-- `gene`
-- `transcript`
-- `exon`
-- `intron`
-- `CDS`
-- `start_codon`
-- `stop_codon`
-- `five_prime_utr`
-- `three_prime_utr`
+Gene annotations contain genes, transcripts, exons, CDS, and UTRs.
 
 Repeat annotations are generated beside the gene annotation when `--output-repeat True`. If `--output` is `/path/to/output/oriongeno.gtf`, the repeat output is:
 
@@ -264,29 +310,40 @@ Repeat annotations are generated beside the gene annotation when `--output-repea
 /path/to/output/oriongeno.repeat.gtf
 ```
 
+Use `.gff` or `.gff3` for GFF3 output, or `.gtf` for GTF. Both formats support
+an additional `.gz` extension. The installed `oriongeno` command and
+`python -m oriongeno` accept the same prediction arguments as `python main.py`.
+
 ## Arguments
 
-| Argument                | Default                            | Meaning                                                                                                                            |
-|:----------------------- |:---------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------- |
-| `--genome`              | `ORIONGENO_GENOME` or required     | Genome FASTA input path.                                                                                                           |
-| `--output`              | `ORIONGENO_OUT` or required        | Gene GTF output path. Repeat output uses the same basename with `.repeat` inserted before the extension.                           |
-| `--checkpoint`          | `ORIONGENO_CHECKPOINT` or required | OrionGeno checkpoint directory to use for inference.                                                                               |
-| `--length`              | `512000`                           | Output window length in bases.                                                                                                     |
-| `--flank`               | `0`                                | Context bases added to each side of every output window. With the default `0`, OrionGeno uses boundary re-prediction where needed. |
-| `--batch-size`          | `8`                                | Number of sequence windows processed at once. Use the GPU recommendations above.                                                   |
-| `--hmm-parallel-factor` | `0`                                | Override the HMM chunk-parallel factor. `0` chooses it automatically.                                                              |
-| `--profile-hmm`         | `False`                            | Print per-batch HMM timing breakdowns.                                                                                             |
-| `--output-gene`         | `True`                             | Write gene annotations.                                                                                                            |
-| `--output-repeat`       | `False`                            | Optional repeat-region output.                                                                                                     |
-| `--species-name`        | empty                              | Optional species name used for species conditioning only. It does not select a checkpoint.                                         |
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `--genome` | required, or `ORIONGENO_GENOME` | Input genome FASTA. |
+| `--checkpoint` | required, or `ORIONGENO_CHECKPOINT` | Directory containing the model configuration and weights. |
+| `--output` | required, or `ORIONGENO_OUT` | `.gff`/`.gff3` for GFF3, `.gtf` for GTF; optional `.gz`. |
+| `--length` | `640000` | Output window length in bases. |
+| `--flank` | `40000` | Context added on each side of an output window. |
+| `--batch-size` | `auto` | Neural-model batch size. An integer sets it explicitly. |
+| `--hmm-decode-batch` | `auto` | HMM batch size; `0` reuses the neural-model batch size. |
+| `--hmm-parallel-factor` | `0` | HMM chunk parallelism; `0` selects it automatically. |
+| `--window-sizing` | `legacy` | `legacy`, `compact-short`, or `compact`. |
+| `--gene-filter-mode` | `none` | `strict` applies coding-structure filtering to the requested output. |
+| `--output-gene` | `True` | Write gene annotations. |
+| `--output-repeat` | `False` | Write repeat annotations beside the gene output. |
+| `--species-name` | empty | Optional species conditioning inside the selected checkpoint. |
+| `--profile-hmm` | `False` | Report prediction and HMM timing. |
 
 Multi-GPU mode also accepts:
 
-| Argument          | Default                                                    | Meaning                                                                                                    |
-|:----------------- |:---------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------- |
-| `--devices`       | `ORIONGENO_DEVICES`, then `CUDA_VISIBLE_DEVICES`, then `0` | Comma-separated GPU IDs, for example `0,1,2,3`.                                                            |
-| `--work-dir`      | `<output basename>.records`                                | Temporary directory for per-GPU FASTA, GTF, logs, and staged merged outputs.                               |
-| `--keep-work-dir` | off                                                        | Keep the temporary work directory after a successful run. Failed runs keep it automatically for debugging. |
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `--devices` | `auto` | Comma-separated GPU IDs, or automatic device discovery. |
+| `--window-task-size` | `32` | Sequence windows assigned to a worker per task. |
+| `--work-dir` | derived from output | Temporary prediction directory. |
+| `--keep-work-dir` | off | Retain temporary prediction files after success. |
+
+See the [parameter guide](docs/oriongeno-parameter-guide.md) for environment
+variables, assembly packing, and multi-node options.
 
 ## Acceleration and Memory Optimization
 
@@ -331,11 +388,33 @@ is already configured:
 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 ```
 
+### V1.0.2 Performance Changes
+
+- Keep a loaded checkpoint in each GPU worker and distribute sequence windows
+  across those workers, including windows from long chromosomes.
+- Tune model-forward and HMM decode batches independently, with memory backoff.
+- Overlap model prediction and HMM decoding and reuse model outputs between stages.
+- Load checkpoint weights without an unnecessary random initialization pass.
+- Limit inference thread pools and avoid clearing the CUDA cache on every batch.
+- Normalize cumulative CPU Viterbi scores to preserve float32 decoding precision.
+
+The [version history](docs/versions.md) records V1.0.1 and V1.0.2 changes.
+
 ## Troubleshooting
 
 If `mamba-ssm` or `causal-conv1d` fails to install, follow the validated wheel-based path in [docs/oriongeno-installation-success-notes.md](docs/oriongeno-installation-success-notes.md). Also confirm that the CUDA runtime, PyTorch build, and NVIDIA driver are compatible.
 
 If prediction fails before inference starts, check that `--genome`, `--checkpoint`, and `--output` are set correctly, and that the checkpoint path points to the exact lineage-specific checkpoint directory you want to use.
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Installation](docs/oriongeno-installation-success-notes.md)
+- [Parameters](docs/oriongeno-parameter-guide.md)
+- [Multi-GPU and multi-node prediction](docs/multi-gpu.md)
+- [Benchmark](docs/benchmark.md)
+- [Version history](docs/versions.md)
+- [Development tests](tests/README.md)
 
 ## License
 

@@ -1,6 +1,8 @@
-import numpy as np
-import gzip, bz2
+import bz2
+import gzip
 import math
+
+import numpy as np
 
 from .sequence_planning import adapted_core_chunk_size
 

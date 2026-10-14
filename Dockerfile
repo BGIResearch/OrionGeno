@@ -31,6 +31,7 @@ COPY requirements.native-cu126.txt ./
 RUN python -m pip install --no-cache-dir --timeout 60 --retries 30 --no-deps -r requirements.native-cu126.txt
 
 COPY oriongeno/ ./oriongeno/
-COPY main.py LICENSE README.md ./
+COPY main.py LICENSE README.md pyproject.toml ./
+RUN python -m pip install --no-cache-dir --no-deps .
 
 ENTRYPOINT ["python", "main.py"]

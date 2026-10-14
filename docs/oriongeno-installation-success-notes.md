@@ -1,12 +1,27 @@
 # OrionGeno Installation Success Notes
 
-This document keeps only the validated success path. It avoids hostnames, IP
-addresses, private user paths, and trial-and-error notes.
+The validated inference environment uses Linux x86-64, Python 3.10.18,
+PyTorch 2.7.0 with CUDA 12.6, and the supplied native extension wheels.
 
-The commands below assume you are already inside the OrionGeno `predicting`
-repository directory.
+## Conda Environment (Quick Setup)
 
-## Copy-Paste Setup
+```bash
+git clone https://github.com/BGIResearch/OrionGeno.git
+cd OrionGeno
+conda env create -f environment.min.yml
+conda activate oriongeno
+python -m pip install --no-deps -r requirements.native-cu126.txt
+python -m pip install .
+oriongeno --version
+oriongeno --help
+oriongeno multi --help
+```
+
+The version command prints `1.0.2`.
+
+## Copy-Paste Setup (Workspace-Local Environment)
+
+Run the commands below inside the OrionGeno repository directory.
 
 Create workspace-local directories for the environment, package caches, temporary
 files, Torch extension builds, Hugging Face cache, and downloaded wheels:
@@ -97,6 +112,18 @@ Install them with:
 python -m pip install --no-cache-dir --no-deps -r requirements.native-cu126.txt
 ```
 
+## Install the OrionGeno Package
+
+```bash
+python -m pip install .
+oriongeno --version
+oriongeno --help
+oriongeno multi --help
+oriongeno multi-node --help
+```
+
+The version command prints `1.0.2`.
+
 ## Verify the Installation
 
 Run these checks from the same activated environment:
@@ -104,7 +131,7 @@ Run these checks from the same activated environment:
 ```bash
 python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 python -c "import torch; print(torch._C._GLIBCXX_USE_CXX11_ABI)"
-python -c "import transformers, mamba_ssm, causal_conv1d, fastapi; print('imports_ok')"
+python -c "import transformers, mamba_ssm, causal_conv1d, numba, oriongeno; print('imports_ok')"
 ```
 
 Expected result:
@@ -123,3 +150,33 @@ Expected result:
   the matching wheel files instead.
 - If source builds are unavoidable, retry with `--no-build-isolation --no-deps`,
   but the validated success path uses wheels.
+
+## Docker
+
+Install and configure the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the host, then build and check the image:
+
+```bash
+docker build -t oriongeno:1.0.2 .
+docker run --rm --gpus all oriongeno:1.0.2 --version
+docker run --rm --gpus all oriongeno:1.0.2 --help
+```
+
+Download model weights separately and mount the checkpoint and data:
+
+```bash
+docker run --rm --gpus all \
+  -v /path/to/model-weights/checkpoints/oriongeno_mammals:/weights:ro \
+  -v /path/to/input:/input:ro \
+  -v /path/to/results:/results \
+  oriongeno:1.0.2 multi \
+  --genome /input/genome.fna \
+  --checkpoint /weights \
+  --output /results/oriongeno.gff3 \
+  --devices 0,1
+```
+
+The image contains inference software and the species-conditioning lookup;
+neural checkpoint weights are downloaded separately. Use output directories
+that the container can write to.

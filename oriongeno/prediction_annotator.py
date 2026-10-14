@@ -6,6 +6,7 @@ import logging
 import os
 import pickle
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 import numpy as np
 import torch
@@ -13,6 +14,13 @@ from tqdm import tqdm
 
 from .constants import DEFAULT_SEQUENCE_LENGTH
 from .data_processing.genome_fasta import GenomeSequences
+from .data_processing.state_features import (
+    GENE_20_TO_FEATURE,
+    GENE_FEATURE_NAMES as GENE_FEATURE_NAMES,
+    gene_state_ranges,
+    reduce_gene_states,
+    resolve_utr_boundary_ranges,
+)
 from .genome_annotation import Anno
 
 GENE_LABEL_COUNT = 20
@@ -21,7 +29,6 @@ BOUNDARY_REPREDICTION_LENGTH_FACTOR = 2
 MODEL_INFERENCE_DTYPE = torch.bfloat16
 HMM_INFERENCE_DTYPE = torch.float32
 INFERENCE_DTYPE = MODEL_INFERENCE_DTYPE
-GENE_FEATURE_NAMES = ["intergenic", "intron", "CDS", "5UTR", "3UTR"]
 DEFAULT_SPECIES_EMBEDDING_PATH = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
     "model_packages",
@@ -48,23 +55,6 @@ CUDA_CACHE_CLEAR_INTERVAL = max(0, _env_int("ORIONGENO_CUDA_CACHE_CLEAR_INTERVAL
 # 0 = fall back to the model-forward batch size (legacy behavior).
 HMM_DECODE_BATCH_SIZE = max(0, _env_int("ORIONGENO_HMM_DECODE_BATCH", 0))
 
-GENE_20_TO_FEATURE = np.array(
-    [
-        0,  # IR
-        1, 1, 1,  # coding intron phase 0/1/2
-        2, 2, 2,  # coding exon phase 0/1/2
-        2,  # START
-        2, 2, 2,  # coding exon-to-intron
-        2, 2, 2,  # coding intron-to-exon
-        2,  # STOP
-        3,  # 5UTR
-        4,  # 3UTR
-        1,  # UTR_EI
-        1,  # UTR_INTRON
-        1,  # UTR_IE
-    ],
-    dtype=np.int64,
-)
 HMM_PREFILTER_WINDOW = 200
 HMM_PREFILTER_CDS_THRESHOLD = 0.8
 CDS_LABEL_INDICES = np.flatnonzero(GENE_20_TO_FEATURE == 2)
@@ -131,6 +121,8 @@ class PredictionAnnotator:
             os.makedirs(temp_dir, exist_ok=True)
         self.temp_dir = temp_dir
         self.sequence_predictions = None
+        self.utr_repair_callback = None
+        self.utr_repair_audit = []
         self.parallel_factor = parallel_factor
         # Explicit constructor arg wins; otherwise fall back to the env override.
         self.hmm_decode_batch = int(hmm_decode_batch) or HMM_DECODE_BATCH_SIZE
@@ -143,26 +135,16 @@ class PredictionAnnotator:
         self._cuda_cache_release_calls = 0
 
     def reduce_label(self, arr):
-        """Reduce 20-label gene states to gene feature classes.
+        """Reduce 20-label states while retaining UTR exon-side markers.
 
         Args:
             arr (np.ndarray): 20-label gene state ids.
 
         Returns:
-            np.ndarray: Feature ids for intergenic, intron, CDS, 5UTR, and 3UTR.
+            np.ndarray: Feature ids, including unresolved UTR_EI/UTR_IE ids.
+                Use get_ranges and post-stitch UTR resolution before export.
         """
-        arr = np.asarray(arr, dtype=np.int64)
-        if arr.size == 0:
-            return arr
-
-        label_min = int(arr.min())
-        label_max = int(arr.max())
-        if label_min < 0 or label_max >= GENE_LABEL_COUNT:
-            raise ValueError(
-                f"Unsupported gene label range [{label_min}, {label_max}]; "
-                f"expected 20-label ids in [0, {GENE_LABEL_COUNT - 1}]."
-            )
-        return GENE_20_TO_FEATURE[arr]
+        return reduce_gene_states(arr)
 
     def _chunk_has_cds_signal(self, chunk_probs):
         """Return True when a chunk has enough CDS probability to need HMM decoding."""
@@ -390,6 +372,7 @@ class PredictionAnnotator:
                 self.gene_pred_hmm_layer.cell.recurrent_init()
                 self.gene_pred_hmm_layer.reverse_cell.recurrent_init()
                 print("20-label HMM layer loaded")
+                self.utr_repair_callback = self.repair_utr_region
             if self.species_name:
                 self._load_species_embedding_vector()
 
@@ -517,6 +500,7 @@ class PredictionAnnotator:
                 if isinstance(item, (tuple, list)) and len(item) > 1 and torch.is_tensor(item[1]):
                     return self._require_2_label_repeat_head(item[1])
         raise TypeError(f"Could not extract repeat logits from model output type {type(model_output)!r}.")
+
 
     def _as_probabilities(self, values, dtype=None):
         if dtype is None:
@@ -862,6 +846,62 @@ class PredictionAnnotator:
         print(f"HMM took {duration/60:.4f} minutes to execute.")
         return hmm_predictions
 
+    def _use_hmm_pipeline(self, encoding_layer_oracle, output_gene):
+        # Caches and oracle inputs retain the existing whole-array semantics.
+        if (not output_gene or not self.hmm or encoding_layer_oracle is not None
+                or self.temp_dir or self.model_device.type != "cuda"
+                or os.environ.get("ORIONGENO_HMM_PIPELINE", "1").lower()
+                in {"0", "false", "no", "off"}):
+            return False
+        from .hmm_layer.Viterbi import _cpu_viterbi_available, _cpu_viterbi_enabled
+        return _cpu_viterbi_available() and _cpu_viterbi_enabled()
+
+    def _pipelined_prediction_outputs(self, inp_chunks, batch_size, output_repeat):
+        """Overlap the next forward group with one ordered HMM job.
+
+        At most two probability groups are resident. Only the worker accesses
+        the HMM; model forward stays on the calling thread. CUDA emissions use
+        the existing device and dtype, preserving decoding numerics.
+        """
+        import numba
+        numba_threads = numba.get_num_threads()
+        span = max(1, self.hmm_decode_batch or batch_size)
+        forward_batch = batch_size
+        gene_parts, repeat_parts = [], []
+
+        def decode(chunks, probabilities):
+            with torch.inference_mode():
+                return self.hmm_predictions_filtered(chunks, probabilities, save=False,
+                                                     batch_size=batch_size)
+
+        pending = None
+        start_time = time.perf_counter()
+        with ThreadPoolExecutor(max_workers=1, initializer=numba.set_num_threads,
+                                initargs=(numba_threads,)) as pool:
+            for start in range(0, len(inp_chunks), span):
+                chunks = inp_chunks[start:start + span]
+                raw = self.sequence_prediction(chunks, save=False, batch_size=forward_batch,
+                                               output_gene=True, output_repeat=output_repeat)
+                # Keep a model OOM reduction for subsequent forward groups.
+                forward_batch = min(forward_batch, self.adapted_batch_size)
+                if output_repeat:
+                    repeat_parts.append(raw["repeat"])
+                    probabilities = raw["gene"]
+                else:
+                    probabilities = raw
+                if pending is not None:
+                    gene_parts.append(pending.result())
+                pending = pool.submit(decode, chunks, probabilities)
+                del raw, probabilities
+            if pending is not None:
+                gene_parts.append(pending.result())
+        self.sequence_predictions = None
+        outputs = {"gene": np.concatenate(gene_parts, axis=0)}
+        if output_repeat:
+            outputs["repeat"] = np.concatenate(repeat_parts, axis=0)
+        logging.info("Pipelined model + HMM took %.3f seconds", time.perf_counter() - start_time)
+        return outputs
+
     def get_prediction_outputs(
         self,
         inp_chunks,
@@ -876,6 +916,9 @@ class PredictionAnnotator:
             return {}
         if not batch_size:
             batch_size = self.adapted_batch_size
+
+        if len(inp_chunks) and self._use_hmm_pipeline(encoding_layer_oracle, output_gene):
+            return self._pipelined_prediction_outputs(inp_chunks, batch_size, output_repeat)
 
         start_time = time.time()
         if encoding_layer_oracle is not None:
@@ -919,6 +962,7 @@ class PredictionAnnotator:
 
         if output_repeat:
             outputs["repeat"] = raw_heads["repeat"]
+
 
         return outputs
     def predict_vit(self, x, gene_outputs):
@@ -1043,6 +1087,33 @@ class PredictionAnnotator:
             txs = txs[1:]
         return initial_tx, txs, current_tx
 
+    def _predict_boundary_windows(self, windows, oracles, batch_size):
+        """Bucket unequal boundary contexts and unpad model outputs afterward."""
+        groups = {}
+        alignment = max(1, getattr(self, "model_input_alignment", 1)) if oracles is None else 1
+        for index, window in enumerate(windows):
+            length = ((len(window) + alignment - 1) // alignment) * alignment
+            groups.setdefault(length, []).append(index)
+        result = [None] * len(windows)
+        for length, indices in groups.items():
+            inputs = []
+            for index in indices:
+                window = windows[index]
+                padded = np.zeros((length, window.shape[1]), dtype=window.dtype)
+                padded[:, 4] = 1
+                padded[:len(window)] = window
+                inputs.append(padded)
+            oracle = None if oracles is None else np.stack([oracles[i] for i in indices])
+            predictions = self.get_predictions(np.stack(inputs), save=False, batch_size=batch_size,
+                                               encoding_layer_oracle=oracle)
+            for index, prediction in zip(indices, predictions):
+                result[index] = prediction[:len(windows[index])]
+        return result
+
+    def repair_utr_region(self, sequence, original, protected, offset, probabilities=None):
+        from .data_processing.utr_repair import joint_decode
+        return joint_decode(self, sequence, original, protected, offset, probabilities)
+
     def create_gene_annotation(
         self,
         y_label,
@@ -1070,13 +1141,18 @@ class PredictionAnnotator:
         """
         batch_size = max(1, self.adapted_batch_size)
 
+        # Row lists also support compact tails with unequal window lengths.
+        y_label = [np.asarray(row) for row in y_label]
+        f_chunks = list(f_chunks)
+        if correct_y_label is not None:
+            correct_y_label = [np.asarray(row) for row in correct_y_label]
         # Convert minus-strand batches back to genomic coordinate order.
         if strand == "-":
-            y_label = y_label[::-1, ::-1]
+            y_label = [row[::-1] for row in y_label[::-1]]
             f_chunks = f_chunks[::-1]
             coords = coords[::-1]
             if correct_y_label is not None:
-                correct_y_label = correct_y_label[::-1, ::-1]
+                correct_y_label = [row[::-1] for row in correct_y_label[::-1]]
 
         # Accumulate transcript feature ranges by sequence name.
         ranges = {}
@@ -1088,20 +1164,16 @@ class PredictionAnnotator:
         re_pred_meta = []
 
         if allow_boundary_reprediction:
-            for i in range(y_label.shape[0] - 1):
-                if coords[i][0] == coords[i + 1][0] and not (
-                    y_label[i, -1] == y_label[i + 1, 0]
-                ):
+            from .data_processing.window_stitching import boundary_transition
+
+            for i in range(len(y_label) - 1):
+                if (coords[i][0] == coords[i + 1][0]
+                    and int(coords[i + 1][2]) == int(coords[i][3]) + 1
+                    and not boundary_transition(y_label[i][-1], y_label[i + 1][0], strand)):
                     left_context = int(f_chunks[i].shape[0])
                     right_context = int(f_chunks[i + 1].shape[0])
                     if left_context <= 0 or right_context <= 0:
                         continue
-                    if left_context != right_context:
-                        raise ValueError(
-                            "Boundary re-prediction requires equal adjacent chunk "
-                            f"lengths, got {left_context} and {right_context}."
-                        )
-
                     if coords[i][1] == "+":
                         re_pred_inp.append(
                             np.concatenate(
@@ -1159,19 +1231,9 @@ class PredictionAnnotator:
         # Re-predict ambiguous chunk boundaries using both complete adjacent
         # chunks, producing a centered window twice the normal chunk length.
         if re_pred_inp:
-            re_pred_inp = np.stack(re_pred_inp, axis=0)
-            re_correct_y_label = (
-                np.stack(re_correct_y_label, axis=0) if re_correct_y_label else None
-            )
-            boundary_batch_size = max(
-                1,
-                batch_size // BOUNDARY_REPREDICTION_LENGTH_FACTOR,
-            )
-            re_pred = self.get_predictions(
-                re_pred_inp,
-                save=False,
-                batch_size=boundary_batch_size,
-                encoding_layer_oracle=re_correct_y_label,
+            boundary_batch_size = max(1, batch_size // BOUNDARY_REPREDICTION_LENGTH_FACTOR)
+            re_pred = self._predict_boundary_windows(
+                re_pred_inp, re_correct_y_label or None, boundary_batch_size,
             )
 
             for current_re, meta in zip(re_pred, re_pred_meta):
@@ -1180,51 +1242,46 @@ class PredictionAnnotator:
                 i = meta["index"]
                 left_replace = meta["left_replace"]
                 right_replace = meta["right_replace"]
-                y_label[i, -left_replace:] = current_re[:left_replace]
-                y_label[i + 1, :right_replace] = current_re[
+                y_label[i][-left_replace:] = current_re[:left_replace]
+                y_label[i + 1][:right_replace] = current_re[
                     left_replace : left_replace + right_replace
                 ]
 
-        end_fragment = []
-        current_seq_name = None
+        from .data_processing.window_stitching import stitch_window_ranges, has_complete_coding_path
 
-        for i, (y, c) in enumerate(zip(y_label, coords)):
-            if c[0] != current_seq_name:
-                current_seq_name = c[0]
-                end_fragment = []
-
-            valid_label_len = max(0, int(c[3]) - int(c[2]) + 1)
-            if valid_label_len <= 0:
-                continue
-            if valid_label_len < len(y):
-                y = y[:valid_label_len]
-            y_ranges = self.get_ranges(y, c[2])
-            is_ir = "intergenic" in [r[0] for r in y_ranges]
-            start_fragment, txs, new_end_fragment = self.get_tx_from_range(y_ranges)
-
-            # Start a new sequence bucket on the first chunk for each scaffold.
-            if c[0] not in ranges:
-                ranges[c[0]] = []
-
-            # Join transcript fragments that continue across adjacent chunks.
-            if (
-                is_ir
-                and end_fragment
-                and start_fragment
-                and i > 0
-                and y_label[i - 1, -1] == y_label[i, 0]
-            ):
-                end_fragment[-1][2] = start_fragment[0][2]
-                end_fragment += start_fragment[1:]
-                ranges[c[0]] += [end_fragment]
-            if is_ir and txs:
-                ranges[c[0]] += txs
-            if is_ir:
-                end_fragment = new_end_fragment
+        blocks, checks = stitch_window_ranges(y_label, coords, strand, self.get_ranges)
+        self.utr_repair_audit = []
+        if (self.utr_repair_callback is not None
+                and os.environ.get("ORIONGENO_UTR_JOINT_REPAIR", "1") != "0"
+                and any(c["status"] == "utr_context_conflict" for c in checks)):
+            from .data_processing.utr_repair import repair_conflicts
+            self.utr_repair_audit = repair_conflicts(
+                y_label, coords, f_chunks, strand, checks, self.utr_repair_callback,
+            )
+            for audit in self.utr_repair_audit:
+                logging.info("UTR joint repair: %s", audit)
+            blocks, checks = stitch_window_ranges(y_label, coords, strand, self.get_ranges)
+        self.boundary_checks = checks
+        for check in checks:
+            if check["status"] != "joined":
+                logging.warning("HMM window join rejected: %s", check)
+        for seq_name, block in blocks:
+            initial, transcripts, terminal = self.get_tx_from_range(block)
+            # Complete coding paths may touch a scaffold/block end. Keep those
+            # without reconnecting partial paths across invalid window joins.
+            if initial and has_complete_coding_path(initial, seq_name, y_label, coords, strand):
+                transcripts.insert(0, initial)
+            if terminal and has_complete_coding_path(terminal, seq_name, y_label, coords, strand):
+                transcripts.append(terminal)
+            ranges.setdefault(seq_name, []).extend(transcripts)
 
         for seq in ranges:
             phase = -1
             for tx in ranges[seq]:
+                # A window may begin/end in a UTR intron without either UTR
+                # body in that window. Resolve the preserved exon-side markers
+                # only after legal joins have supplied the transcript context.
+                tx = resolve_utr_boundary_ranges(tx)
                 tx_id += 1
                 t_id = f"g{tx_id}.t1"
                 g_id = f"g{tx_id}"
@@ -1268,8 +1325,9 @@ class PredictionAnnotator:
     def get_ranges(self, encoded_labels, offset=0):
         """Convert encoded label runs into genomic feature ranges.
 
-        This method reduces the 20-label state sequence to gene feature classes,
-        then groups consecutive positions with the same feature label.
+        UTR splice markers are restored to their explicitly labeled UTR side.
+        Markers without local context are retained until transcript assembly
+        after window stitching; they must not be exported as intron bases.
 
         Args:
             encoded_labels (Iterable[int]): Encoded labels representing genomic features.
@@ -1278,19 +1336,4 @@ class PredictionAnnotator:
             List[List]: A list of three-element lists where each list contains the feature type
             as a string and the start and end points as integers.
         """
-        arr = np.array(encoded_labels)
-
-        arr = self.reduce_label(arr)
-
-        # Split the label vector at every class change.
-        change_points = np.where(np.diff(arr) != 0)[0]
-        start_points = np.insert(change_points + 1, 0, 0)
-        end_points = np.append(change_points, arr.size - 1)
-
-        features = GENE_FEATURE_NAMES
-        ranges = [
-            [features[arr[start]], start + offset, end + offset]
-            for start, end in zip(start_points, end_points)
-        ]
-
-        return ranges
+        return gene_state_ranges(encoded_labels, offset)

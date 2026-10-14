@@ -217,6 +217,15 @@ class GenePredHMMEmitter(SimpleGenePredHMMEmitter):
         )
         self.build()
 
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
+                                      missing_keys, unexpected_keys, error_msgs)
+        # This is a derived, frozen grammar table, not a learned weight. Old
+        # checkpoints must not restore the historical EI1 stop-mask omission.
+        with torch.no_grad():
+            self.codon_probs.copy_(self._build_codon_probs().to(self.codon_probs))
+
     def _build_codon_probs(self):
         state = BASE_GENE_PRED_STATE_TO_INDEX
         any_codon = make_codon_probs([("NNN", 1.0)], pivot_left=False)
@@ -233,6 +242,8 @@ class GenePredHMMEmitter(SimpleGenePredHMMEmitter):
         for copy_index in range(self.num_copies):
             left[expanded_state_index(state["START"], copy_index)] = start
             right[expanded_state_index(state["Exon2"], copy_index)] = not_stop
+            # EI1 also consumes the third CDS base, immediately before a donor.
+            right[expanded_state_index(state["EI1"], copy_index)] = not_stop
             right[expanded_state_index(state["STOP"], copy_index)] = make_codon_probs(
                 self.stop_codons,
                 pivot_left=False,

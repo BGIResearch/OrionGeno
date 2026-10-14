@@ -9,6 +9,7 @@ import os
 import numpy as np
 
 from .constants import DEFAULT_GENE_FILTER_MODE
+from .annotation_io import format_gff3_attributes, open_annotation_text
 
 
 def annotation_output_is_gff(output_path):
@@ -24,10 +25,12 @@ def annotation_output_format(output_path):
 
 def repeat_output_path(output_base):
     """Return the user-facing repeat annotation path beside the requested output."""
-    root, ext = os.path.splitext(os.fspath(output_base))
+    path = os.fspath(output_base)
+    compression = ".gz" if path.lower().endswith(".gz") else ""
+    root, ext = os.path.splitext(path[:-3] if compression else path)
     if ext:
-        return f"{root}.repeat{ext}"
-    return f"{os.fspath(output_base)}.repeat.gff"
+        return f"{root}.repeat{ext}{compression}"
+    return f"{root}.repeat.gff{compression}"
 
 
 def _reset_transcript_lines(transcript):
@@ -93,8 +96,9 @@ def _clip_transcripts_to_bounds(transcripts, genome_seq_dict):
     }
 
 
-def _write_prediction_gff(transcripts, output_path, id_prefix, genome_seq_dict=None):
+def _write_prediction_gff(transcripts, output_path, id_prefix, genome_seq_dict=None, genome=None):
     from .genome_annotation import Anno
+    from .prediction_format import write_prediction_annotation
 
     annotation = Anno("", "oriongeno")
     annotation.add_transcripts(copy.deepcopy(transcripts))
@@ -111,10 +115,10 @@ def _write_prediction_gff(transcripts, output_path, id_prefix, genome_seq_dict=N
     annotation.norm_tx_format()
     annotation.find_genes()
     annotation.rename_tx_ids(id_prefix)
-    if annotation_output_is_gff(output_path):
-        annotation.write_gff3(output_path)
-    else:
-        annotation.write_anno(output_path)
+    write_prediction_annotation(
+        annotation, output_path, genome=genome,
+        gene_prefix=f"{id_prefix}_OG" if id_prefix else "OG",
+    )
     return annotation
 
 
@@ -242,18 +246,18 @@ class RepeatGffWriter:
             self.records,
             key=lambda record: (
                 record["seq_name"],
-                record["strand"],
                 record["start"],
                 record["end"],
+                record["strand"],
             ),
         )
-        with open(self.output_path, "w", encoding="utf-8") as file_obj:
+        with open_annotation_text(self.output_path, "w") as file_obj:
             if annotation_output_is_gff(self.output_path):
                 file_obj.write("##gff-version 3\n")
             for index, record in enumerate(sorted_records, start=1):
                 repeat_id = f"{self.id_prefix}r{index}" if self.id_prefix else f"r{index}"
                 if annotation_output_is_gff(self.output_path):
-                    attributes = f"ID={repeat_id}"
+                    attributes = format_gff3_attributes([("ID", repeat_id)])
                 else:
                     attributes = f'repeat_id "{repeat_id}";'
                 fields = [
@@ -271,6 +275,11 @@ class RepeatGffWriter:
         logging.info("Repeat %s records: %s", annotation_output_format(self.output_path), len(sorted_records))
         logging.info("Repeat %s output: %s", annotation_output_format(self.output_path), self.output_path)
         return self.output_path
+
+
+
+
+
 
 
 def _assemble_transcript(exons, sequence, strand):
@@ -379,6 +388,7 @@ def filter_and_write_outputs(
             output_path,
             id_prefix,
             genome_seq_dict=genome_seq_dict,
+            genome=genome,
         )
     if gene_filter_mode != "strict":
         raise ValueError(f"Unsupported gene_filter_mode: {gene_filter_mode!r}")
@@ -389,4 +399,5 @@ def filter_and_write_outputs(
         output_path,
         id_prefix,
         genome_seq_dict=genome_seq_dict,
+        genome=genome,
     )

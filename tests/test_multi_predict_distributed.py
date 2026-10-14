@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from oriongeno import multi_predict
+from oriongeno import distributed_predict as multi_predict
 
 
 class DistributedMultiPredictTests(unittest.TestCase):

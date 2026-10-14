@@ -1,24 +1,42 @@
+from enum import Enum
+import warnings
+
 import torch
 import torch.nn as nn
-from enum import Enum
 
 from . import Initializers as initializers
 from . import Priors as priors
 
-class ProfileHMMEmitter(nn.Module):
-    """Emission module for profile HMM states."""
 
-    def __init__(self,
-                 emission_init=initializers.make_default_emission_init(),
-                 insertion_init=initializers.make_default_insertion_init(),
-                 prior=None,
-                 frozen_insertions=True,
-                 device=None,
-                 **kwargs):
+class ProfileHMMEmitter(nn.Module):
+    """Deprecated emission module for legacy profile-HMM states."""
+
+    def __init__(
+        self,
+        emission_init=initializers.make_default_emission_init(),
+        insertion_init=initializers.make_default_insertion_init(),
+        prior=None,
+        frozen_insertions=True,
+        device=None,
+        **kwargs,
+    ):
         """Configure emission and insertion initializers for each profile model."""
         super(ProfileHMMEmitter, self).__init__(**kwargs)
-        self.emission_init = [emission_init] if not hasattr(emission_init, '__iter__') else emission_init
-        self.insertion_init = [insertion_init] if not hasattr(insertion_init, '__iter__') else insertion_init
+        warnings.warn(
+            "ProfileHMMEmitter is part of the incomplete legacy Profile-HMM API "
+            "and will be removed in OrionGeno 0.2.0. Use GenePredHMMLayer for "
+            "gene prediction.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.emission_init = (
+            [emission_init] if not hasattr(emission_init, "__iter__") else emission_init
+        )
+        self.insertion_init = (
+            [insertion_init]
+            if not hasattr(insertion_init, "__iter__")
+            else insertion_init
+        )
         self.prior = priors.AminoAcidPrior() if prior is None else prior
         self.frozen_insertions = frozen_insertions
 
@@ -27,24 +45,27 @@ class ProfileHMMEmitter(nn.Module):
         self.lengths = lengths
         self.num_models = len(lengths)
 
-        assert len(self.lengths) == len(self.emission_init), \
+        assert len(self.lengths) == len(self.emission_init), (
             f"Expected one emission initializer per model, got {len(self.emission_init)} initializers for {len(self.lengths)} models."
-        assert len(self.lengths) == len(self.insertion_init), \
+        )
+        assert len(self.lengths) == len(self.insertion_init), (
             f"Expected one insertion initializer per model, got {len(self.insertion_init)} initializers for {len(self.lengths)} models."
+        )
 
     def build(self, input_shape):
         """Create module parameters lazily."""
         if hasattr(self, "built") and self.built:
             return
         s = input_shape[-1] - 1
-        self.emission_kernel = nn.ParameterList([
-            nn.Parameter(init(torch.Size([length, s])))
-            for length, init in zip(self.lengths, self.emission_init)
-        ])
-        self.insertion_kernel = nn.ParameterList([
-            nn.Parameter(init(torch.Size([s])))
-            for init in self.insertion_init
-        ])
+        self.emission_kernel = nn.ParameterList(
+            [
+                nn.Parameter(init(torch.Size([length, s])))
+                for length, init in zip(self.lengths, self.emission_init)
+            ]
+        )
+        self.insertion_kernel = nn.ParameterList(
+            [nn.Parameter(init(torch.Size([s]))) for init in self.insertion_init]
+        )
         if self.frozen_insertions:
             for param in self.insertion_kernel:
                 param.requires_grad = False
@@ -70,7 +91,9 @@ class ProfileHMMEmitter(nn.Module):
         emissions = torch.cat([i1, em, i2], dim=0)
         emissions = torch.softmax(emissions, dim=-1)
         emissions = torch.cat([emissions, torch.zeros_like(emissions[:, :1])], dim=-1)
-        end_state_emission = torch.nn.functional.one_hot(torch.tensor([s]), num_classes=s + 1, dtype=em.dtype)
+        end_state_emission = torch.nn.functional.one_hot(
+            torch.tensor([s]), num_classes=s + 1, dtype=em.dtype
+        )
         emissions = torch.cat([emissions, end_state_emission], dim=0)
         return emissions
 
@@ -94,7 +117,7 @@ class ProfileHMMEmitter(nn.Module):
         """Run the module forward pass."""
         input_shape = inputs.shape
         inputs = inputs.view(inputs.shape[0], -1, input_shape[-1])
-        B = self.B_transposed[..., :input_shape[-1], :]
+        B = self.B_transposed[..., : input_shape[-1], :]
         emit = torch.einsum("kbs,ksq->kbq", inputs, B)
         emit_shape = torch.Size([B.shape[0]] + list(input_shape[1:-1]) + [B.shape[-1]])
         emit = emit.view(emit_shape)
@@ -102,7 +125,7 @@ class ProfileHMMEmitter(nn.Module):
 
     def get_aux_loss(self):
         """Return auxiliary regularization loss."""
-        return torch.tensor(0., dtype=self.dtype)
+        return torch.tensor(0.0, dtype=self.dtype)
 
     def get_prior_log_density(self):
         """Return the prior log density for current parameters."""
@@ -112,14 +135,20 @@ class ProfileHMMEmitter(nn.Module):
         """Create a copy for a subset of models."""
         if model_indices is None:
             model_indices = range(len(self.emission_init))
-        sub_emission_init = [initializers.ConstantInitializer(self.emission_kernel[i].detach().numpy()) for i in model_indices]
-        sub_insertion_init = [initializers.ConstantInitializer(self.insertion_kernel[i].detach().numpy()) for i in model_indices]
+        sub_emission_init = [
+            initializers.ConstantInitializer(self.emission_kernel[i].detach().numpy())
+            for i in model_indices
+        ]
+        sub_insertion_init = [
+            initializers.ConstantInitializer(self.insertion_kernel[i].detach().numpy())
+            for i in model_indices
+        ]
         emitter_copy = ProfileHMMEmitter(
             emission_init=sub_emission_init,
             insertion_init=sub_insertion_init,
             prior=self.prior,
             frozen_insertions=self.frozen_insertions,
-            dtype=self.dtype
+            dtype=self.dtype,
         )
         if share_kernels:
             emitter_copy.emission_kernel = self.emission_kernel
@@ -130,20 +159,26 @@ class ProfileHMMEmitter(nn.Module):
     def get_config(self):
         """Return serializable configuration values."""
         config = super(ProfileHMMEmitter, self).get_config()
-        config.update({
-            "lengths": self.lengths,
-            "emission_init": self.emission_init,
-            "insertion_init": self.insertion_init,
-            "prior": self.prior,
-            "frozen_insertions": self.frozen_insertions
-        })
+        config.update(
+            {
+                "lengths": self.lengths,
+                "emission_init": self.emission_init,
+                "insertion_init": self.insertion_init,
+                "prior": self.prior,
+                "frozen_insertions": self.frozen_insertions,
+            }
+        )
         return config
 
     @classmethod
     def from_config(cls, config):
         """Create an instance from serialized configuration values."""
-        config["emission_init"] = [initializers.deserialize(e) for e in config["emission_init"]]
-        config["insertion_init"] = [initializers.deserialize(i) for i in config["insertion_init"]]
+        config["emission_init"] = [
+            initializers.deserialize(e) for e in config["emission_init"]
+        ]
+        config["insertion_init"] = [
+            initializers.deserialize(i) for i in config["insertion_init"]
+        ]
         config["prior"] = initializers.deserialize(config["prior"])
         lengths = config.pop("lengths")
         emitter = cls(**config)
@@ -153,6 +188,7 @@ class ProfileHMMEmitter(nn.Module):
     def __repr__(self):
         """Return a concise string representation."""
         return f"ProfileHMMEmitter(\n emission_init={self.emission_init[0]},\n insertion_init={self.insertion_init[0]},\n prior={self.prior},\n frozen_insertions={self.frozen_insertions}, )"
+
 
 class TemperatureMode(Enum):
     TRAINABLE = 1
@@ -164,9 +200,11 @@ class TemperatureMode(Enum):
 
     @staticmethod
     def from_string(name):
-        return {"trainable": TemperatureMode.TRAINABLE,
-                "length_norm": TemperatureMode.LENGTH_NORM,
-                "cold_to_warm": TemperatureMode.COLD_TO_WARM,
-                "warm_to_cold": TemperatureMode.WARM_TO_COLD,
-                "constant": TemperatureMode.CONSTANT,
-                "none": TemperatureMode.NONE}[name.lower()]
+        return {
+            "trainable": TemperatureMode.TRAINABLE,
+            "length_norm": TemperatureMode.LENGTH_NORM,
+            "cold_to_warm": TemperatureMode.COLD_TO_WARM,
+            "warm_to_cold": TemperatureMode.WARM_TO_COLD,
+            "constant": TemperatureMode.CONSTANT,
+            "none": TemperatureMode.NONE,
+        }[name.lower()]

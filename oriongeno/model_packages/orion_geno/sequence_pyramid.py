@@ -2,7 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .species_conditioning import build_species_condition
+from .species_conditioning import build_species_condition, SpeciesConditionProjector
+
+
+def _species_injection_settings(settings) -> tuple[str, int, float]:
+    """Read species-injection config: mode, embedding dim, gain init."""
+    mode = str(settings.get("species_injection", "projected_gain"))
+    emb_dim = int(settings.get("species_embedding_dim", 384))
+    gain_init = float(settings.get("species_gain_init", 0.3))
+    return mode, emb_dim, gain_init
 
 
 class RootMeanSquareBatchNorm1d(nn.Module):
@@ -116,13 +124,24 @@ class SequencePyramidEncoder(nn.Module):
             stage_channels += channel_growth
         self.pool = nn.MaxPool1d(pooling_kernel_size, pooling_kernel_size)
 
+        self.species_injection_mode, emb_dim, gain_init = _species_injection_settings(settings)
+        if self.species_injection_mode == "projected_gain":
+            self.species_projector = SpeciesConditionProjector(
+                emb_dim, self.output_channels, gain_init=gain_init
+            )
+        else:
+            self.species_projector = None
+
     def forward(self, x, species_embedding=None):
         x = x.permute(0, 2, 1)
-        species_condition = build_species_condition(
-            species_embedding,
-            expected_channels=self.output_channels,
-            context="encoder scale-1 features",
-        )
+        if self.species_projector is not None:
+            species_condition = self.species_projector(species_embedding)
+        else:
+            species_condition = build_species_condition(
+                species_embedding,
+                expected_channels=self.output_channels,
+                context="encoder scale-1 features",
+            )
         skip_connections = {}
         for stage, scale in zip(self.stages, self.feature_scales):
             x = stage(x)
@@ -177,16 +196,27 @@ class SequencePyramidDecoder(nn.Module):
                 "feature_scales for the configured OrionGeno decoder."
             )
 
+        self.species_injection_mode, emb_dim, gain_init = _species_injection_settings(settings)
+        if self.species_injection_mode == "projected_gain":
+            self.species_projector = SpeciesConditionProjector(
+                emb_dim, int(decoder_channel_sizes[-1]), gain_init=gain_init
+            )
+        else:
+            self.species_projector = None
+
     def forward(self, x, skip_connections, species_embedding=None):
         if x.dim() == 3 and x.shape[1] != skip_connections["scale_1"].shape[1]:
             x = x.permute(0, 2, 1)
 
         output_channels = self.stages[-1].output_block.convolution.out_channels
-        species_condition = build_species_condition(
-            species_embedding,
-            expected_channels=output_channels,
-            context="decoder output features",
-        )
+        if self.species_projector is not None:
+            species_condition = self.species_projector(species_embedding)
+        else:
+            species_condition = build_species_condition(
+                species_embedding,
+                expected_channels=output_channels,
+                context="decoder output features",
+            )
 
         for index, scale in enumerate(self.skip_scales):
             x = self.stages[index](x, skip_connections[f"scale_{scale}"])

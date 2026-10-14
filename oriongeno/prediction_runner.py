@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import json
 import logging
 import os
 import sys
@@ -11,8 +12,9 @@ import time
 
 import numpy as np
 
+from .inference_runtime import predict_with_memory_backoff
+
 from .cli_config import (
-    AUTO_VALUE,
     auto_nonnegative_int,
     auto_positive_int,
     check_file_exists,
@@ -242,6 +244,10 @@ def _predict_internal_chunks(
     total_groups,
     strand_label,
 ):
+    if getattr(context, "window_sizing", "legacy") != "legacy":
+        from .window_layout import compact_prediction_groups
+        return compact_prediction_groups(predictor, strand_inputs, context,
+                                         MAX_CHUNKS_PER_INFERENCE_GROUP)
     max_chunk_count = max(item["x_data"].shape[0] for item in strand_inputs)
     chunk_span = _internal_chunk_span(len(strand_inputs))
     if chunk_span is None or chunk_span >= max_chunk_count:
@@ -289,8 +295,8 @@ def _predict_internal_chunks(
                 combined_chunks.shape,
             )
 
-        prediction_outputs = predictor.get_prediction_outputs(
-            combined_chunks,
+        prediction_outputs = predict_with_memory_backoff(
+            predictor, combined_chunks, save=True,
             output_gene=context.output_gene,
             output_repeat=context.output_repeat,
         )
@@ -335,24 +341,29 @@ def _predict_genome_records(
     repeat_writer,
     coordinate_mapper,
     log_prefix="OrionGeno",
+    session=None,
 ):
     from .prediction_annotator import PredictionAnnotator
 
     inference_seq_dict = {}
 
-    predictor = PredictionAnnotator(
-        model_path=context.checkpoint_path,
-        seq_len=context.seq_len,
-        batch_size=context.batch_size,
-        hmm=USE_HMM and context.output_gene,
-        temp_dir=None,
-        genome=genome,
-        upper_only=UPPER_ONLY,
-        species_name=context.species_name,
-        strand="+",
-        parallel_factor=context.parallel_factor,
-        hmm_decode_batch=context.hmm_decode_batch,
-    )
+    predictor = session.get("predictor") if session is not None else None
+    if predictor is None:
+        predictor = PredictionAnnotator(
+            model_path=context.checkpoint_path,
+            seq_len=context.seq_len,
+            batch_size=context.batch_size,
+            hmm=USE_HMM and context.output_gene,
+            temp_dir=None,
+            genome=genome,
+            upper_only=UPPER_ONLY,
+            species_name=context.species_name,
+            strand="+",
+            parallel_factor=context.parallel_factor,
+            hmm_decode_batch=context.hmm_decode_batch,
+        )
+    else:
+        predictor.genome = genome
 
     genome_fasta = predictor.init_fasta(
         chunk_len=context.seq_len,
@@ -378,7 +389,19 @@ def _predict_genome_records(
     if not all_seq_names:
         logging.info("No sequences available for prediction.")
     else:
-        predictor.load_model(summary=False)
+        if session is None or "predictor" not in session:
+            if session is not None and "window_pool" in session:
+                pool = session["window_pool"]
+                predictor.get_prediction_outputs = pool.predict
+                predictor.get_predictions = pool.predict_gene
+                predictor.utr_repair_callback = pool.repair_utr_region
+            else:
+                predictor.load_model(summary=False)
+            # Boundary re-prediction must satisfy both model and GPU-HMM
+            # divisibility when the CPU decoder is unavailable or disabled.
+            predictor.model_input_alignment = getattr(context, "window_alignment", 1)
+            if session is not None:
+                session["predictor"] = predictor
 
         strand_batches = _strand_batches(context.strands)
         max_strands_per_batch = max(len(strand_batch) for strand_batch in strand_batches)
@@ -467,6 +490,10 @@ def _predict_genome_records(
                             item["prediction_outputs"]["gene"],
                             context.flank_size,
                         )
+                        if "prediction_lengths" in item:
+                            from .window_layout import compact_core_rows
+                            effective_labels = compact_core_rows(effective_labels, item, context.flank_size)
+                            effective_chunks = compact_core_rows(effective_chunks, item, context.flank_size)
                         annotation, transcript_counter = predictor.create_gene_annotation(
                             y_label=effective_labels,
                             coords=coords,
@@ -477,6 +504,13 @@ def _predict_genome_records(
                             filt=False,
                             allow_boundary_reprediction=context.flank_size == 0,
                         )
+                        if getattr(context, "boundary_audit_path", None):
+                            with open(context.boundary_audit_path, "a", encoding="utf-8") as handle:
+                                for check in predictor.boundary_checks:
+                                    handle.write(json.dumps({**check, "pass": log_prefix}) + "\n")
+                            with open(context.repair_audit_path, "a", encoding="utf-8") as handle:
+                                for audit in getattr(predictor, "utr_repair_audit", []):
+                                    handle.write(json.dumps({**audit, "pass": log_prefix}) + "\n")
                         del effective_labels
 
                     if context.output_repeat:
@@ -491,6 +525,7 @@ def _predict_genome_records(
                             inference_seq_dict,
                         )
                         del effective_repeat
+
 
                     del effective_chunks
 
@@ -513,6 +548,11 @@ def _predict_genome_records(
             "recheck_sequences": [],
         }
 
+    if session is not None:
+        # Retain the model/HMM, not the previous task's sequence data.
+        predictor.genome = None
+        predictor.fasta_seq_lens = {}
+        predictor.sequence_predictions = None
     return annotation, transcript_counter, remap_stats
 
 
@@ -533,8 +573,12 @@ def _remove_annotation_sequences(annotation, seq_names):
     annotation.gene_gtf = {}
 
 
-def run_prediction(args):
+def run_prediction(args, *, session=None):
+    """Predict a FASTA; an internal worker session reuses one fixed model configuration."""
     _load_runtime_env_config()
+    from .inference_runtime import configure_inference_backend, configure_inference_threads
+    configure_inference_threads()
+    configure_inference_backend()
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     if getattr(args, "profile_hmm", False):
         os.environ["ORIONGENO_PROFILE_HMM"] = "1"
@@ -569,7 +613,12 @@ def run_prediction(args):
     model_seq_len = seq_len + 2 * flank_size
     parallel_factor = _resolve_parallel_factor(args, model_seq_len, seq_len)
     check_parallel_factor(parallel_factor, model_seq_len, core_seq_len=seq_len)
-    batch_size = _resolve_auto_batch_size(args.batch_size, model_seq_len)
+    batch_size = (
+        session["batch_size"] if session is not None and "batch_size" in session
+        else _resolve_auto_batch_size(args.batch_size, model_seq_len)
+    )
+    if session is not None:
+        session["batch_size"] = batch_size
     hmm_decode_batch = _resolve_auto_hmm_decode_batch(
         getattr(args, "hmm_decode_batch", DEFAULT_HMM_DECODE_BATCH),
         batch_size,
@@ -591,6 +640,25 @@ def run_prediction(args):
         gene_filter_mode=args.gene_filter_mode,
         hmm_decode_batch=hmm_decode_batch,
     )
+    context.window_sizing = getattr(args, "window_sizing", "legacy")
+    context.model_input_alignment = 1
+    if context.window_sizing != "legacy":
+        from .window_layout import model_input_alignment
+        from .hmm_layer.Viterbi import _cpu_viterbi_available, _cpu_viterbi_enabled
+        from math import lcm
+        context.model_input_alignment = model_input_alignment(checkpoint_path)
+        cpu_decode = _cpu_viterbi_available() and _cpu_viterbi_enabled()
+        context.window_alignment = lcm(context.model_input_alignment,
+                                       1 if cpu_decode or not USE_HMM else parallel_factor)
+        logging.info("Compact window input alignment: %d; policy: %s",
+                     context.window_alignment, context.window_sizing)
+    if args.output_gene:
+        context.boundary_audit_path = output_path + ".hmm_boundaries.jsonl"
+        context.repair_audit_path = output_path + ".utr_repairs.jsonl"
+        with open(context.repair_audit_path, "w", encoding="utf-8"):
+            pass
+        with open(context.boundary_audit_path, "w", encoding="utf-8"):
+            pass
 
     if species_name:
         logging.info("Species: %s", species_name)
@@ -657,6 +725,7 @@ def run_prediction(args):
         transcript_counter=transcript_counter,
         repeat_writer=repeat_writer,
         coordinate_mapper=coordinate_mapper,
+        session=session,
     )
 
     recheck_sequences = set(remap_stats["recheck_sequences"])
@@ -680,6 +749,7 @@ def run_prediction(args):
             repeat_writer=repeat_writer,
             coordinate_mapper=None,
             log_prefix="OrionGeno recheck",
+            session=session,
         )
 
     if args.output_gene:
@@ -696,6 +766,7 @@ def run_prediction(args):
     if args.output_repeat:
         repeat_writer.write()
 
+
     duration = time.time() - start_time
     print(f"OrionGeno finished in {duration / 60:.4f} minutes.")
 
@@ -705,6 +776,9 @@ def build_predict_parser(prog="main.py"):
         prog=prog,
         description="Run OrionGeno prediction from a genome FASTA and checkpoint.",
     )
+    parser.add_argument("--window-sizing", choices=("legacy", "compact-short", "compact"),
+                        default="legacy", help="Optional N-padding reduction; may change predictions. "
+                        "compact-short affects short records; compact also shortens final windows.")
     parser.add_argument(
         "--genome",
         default=env_str("ORIONGENO_GENOME", ""),
@@ -714,7 +788,7 @@ def build_predict_parser(prog="main.py"):
         "--output",
         dest="out",
         default=env_str("ORIONGENO_OUT", ""),
-        help="Gene GFF output path. Repeat output uses the same basename with .repeat.gff.",
+        help="Annotation output path (.gff/.gff3 or .gtf, with optional .gz). Repeat output inserts .repeat before the extension.",
     )
     parser.add_argument(
         "--checkpoint",

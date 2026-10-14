@@ -34,9 +34,9 @@ def _cpu_viterbi_available():
     global _CPU_VITERBI_AVAILABLE
     if _CPU_VITERBI_AVAILABLE is None:
         try:
-            from .viterbi_cpu import viterbi_decode_cpu  # noqa: F401
+            from .viterbi_cpu import viterbi_decode_cpu
 
-            _CPU_VITERBI_AVAILABLE = True
+            _CPU_VITERBI_AVAILABLE = callable(viterbi_decode_cpu)
         except Exception as exc:  # numba/llvmlite missing or broken
             _CPU_VITERBI_AVAILABLE = False
             import warnings
@@ -520,7 +520,7 @@ def viterbi_full_chunk_backtracking_from_backpointers(
     output_type=torch.int32,
 ):
     """Recover full chunk paths from compact local backpointers."""
-    num_model, b, num_chunks, num_start_states, backtrack_len, q = local_backpointers.shape
+    num_model, b, num_chunks, _, backtrack_len, q = local_backpointers.shape
     chunk_length = backtrack_len + 1
 
     start_states = viterbi_chunk_borders[:, :, :, 0].to(torch.long)
@@ -566,6 +566,7 @@ def viterbi(
     parallel_factor=1,
     return_variables=False,
     non_homogeneous_mask_func=None,
+    emission_probs=None,
 ):
     """Computes the most likely sequence of hidden states."""
     profile_hmm = _profile_hmm_enabled()
@@ -582,10 +583,12 @@ def viterbi(
     seq_lens = (sequences[..., -1] == 0).to(torch.int32).sum(dim=-1)
 
     profile_start = _profile_mark(sequences, profile_hmm)
-    emission_probs = hmm_cell.emission_probs(
-        sequences, end_hints=end_hints, training=False
-    )
-    profile_times["emission"] = _profile_elapsed(
+    emission_precomputed = emission_probs is not None
+    if emission_probs is None:
+        emission_probs = hmm_cell.emission_probs(
+            sequences, end_hints=end_hints, training=False
+        )
+    profile_times["emission_reuse" if emission_precomputed else "emission"] = _profile_elapsed(
         profile_start, emission_probs, profile_hmm
     )
     num_model, b, seq_len, q = emission_probs.shape

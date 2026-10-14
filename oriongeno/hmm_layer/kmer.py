@@ -6,9 +6,9 @@ def make_k_mers(sequences, k, pivot_left=True):
     n = sequences.shape[-1] - 1
     n = torch.tensor(n, dtype=sequences.dtype, device=sequences.device)
 
-    sequences_no_N = sequences[..., :-1]
     N_pos = (sequences[..., -1:] == 1).to(sequences.dtype)
-    sequences_no_N += (1 / n) * N_pos
+    # Do not mutate the caller's one-hot tensor: left/right k-mers share it.
+    sequences_no_N = sequences[..., :-1] + (1 / n) * N_pos
 
     pad = torch.ones_like(sequences_no_N[:, :k - 1, :], dtype=sequences.dtype) / n
     if pivot_left:

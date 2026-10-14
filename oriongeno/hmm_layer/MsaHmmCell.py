@@ -1,4 +1,5 @@
 import copy
+import warnings
 
 import torch
 import torch.nn as nn
@@ -7,9 +8,21 @@ from .Emitter import ProfileHMMEmitter
 from .Transitioner import ProfileHMMTransitioner
 from .Utility import get_num_states
 
+
 class HmmCell(nn.Module):
     """Generic HMM cell that performs one forward or backward recursion step."""
-    def __init__(self, num_states, dim, emitter, transitioner, use_step_counter=False, use_fake_step_counter=False, device=None, **kwargs):
+
+    def __init__(
+        self,
+        num_states,
+        dim,
+        emitter,
+        transitioner,
+        use_step_counter=False,
+        use_fake_step_counter=False,
+        device=None,
+        **kwargs,
+    ):
         super(HmmCell, self).__init__(**kwargs)
         self.num_states = num_states
         self.num_models = len(self.num_states)
@@ -65,7 +78,9 @@ class HmmCell(nn.Module):
     def forward(self, emission_probs, states, training=None, init=False):
         """Advance scaled forward probabilities by one observation."""
         old_scaled_forward, old_loglik = states
-        old_scaled_forward = old_scaled_forward.view(self.num_models, -1, self.max_num_states)
+        old_scaled_forward = old_scaled_forward.view(
+            self.num_models, -1, self.max_num_states
+        )
         if init:
             R = old_scaled_forward
         else:
@@ -98,12 +113,18 @@ class HmmCell(nn.Module):
             self.step_counter += 1
         return output, new_state
 
-    def get_initial_state(self, inputs=None, batch_size=None, parallel_factor=1, device=None):
+    def get_initial_state(
+        self, inputs=None, batch_size=None, parallel_factor=1, device=None
+    ):
         """Return recurrent state tensors for serial or chunk-parallel evaluation."""
         dtype, device = self._runtime_dtype_device(inputs=inputs, device=device)
         if parallel_factor == 1:
             if self.reverse:
-                init_dist = torch.ones((self.num_models * batch_size, self.max_num_states), dtype=dtype, device=device)
+                init_dist = torch.ones(
+                    (self.num_models * batch_size, self.max_num_states),
+                    dtype=dtype,
+                    device=device,
+                )
             else:
                 init_dist = (
                     self.make_initial_distribution()
@@ -112,43 +133,103 @@ class HmmCell(nn.Module):
                     .view(-1, self.max_num_states)
                     .to(device=device, dtype=dtype)
                 )
-            loglik = torch.zeros((self.num_models * batch_size, 1), dtype=dtype, device=device)
-            return [init_dist.to(device=device, dtype=dtype), loglik.to(device=device, dtype=dtype)]
+            loglik = torch.zeros(
+                (self.num_models * batch_size, 1), dtype=dtype, device=device
+            )
+            return [
+                init_dist.to(device=device, dtype=dtype),
+                loglik.to(device=device, dtype=dtype),
+            ]
         else:
-            indices = torch.arange(self.max_num_states, device=device).repeat(self.num_models * batch_size)
-            init_dist = torch.nn.functional.one_hot(indices, num_classes=self.max_num_states).to(dtype=dtype, device=device)
+            indices = torch.arange(self.max_num_states, device=device).repeat(
+                self.num_models * batch_size
+            )
+            init_dist = torch.nn.functional.one_hot(
+                indices, num_classes=self.max_num_states
+            ).to(dtype=dtype, device=device)
             if self.reverse:
-                init_dist_chunk = init_dist.clone().view(self.num_models * batch_size, self.max_num_states, self.max_num_states)
-                first_emissions = inputs[:, 0, :].view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states)
-                first_emissions = torch.roll(first_emissions, shifts=-1, dims=2).view(self.num_models * batch_size, 1, self.max_num_states)
+                init_dist_chunk = init_dist.clone().view(
+                    self.num_models * batch_size,
+                    self.max_num_states,
+                    self.max_num_states,
+                )
+                first_emissions = inputs[:, 0, :].view(
+                    self.num_models,
+                    batch_size // parallel_factor,
+                    parallel_factor,
+                    self.max_num_states,
+                )
+                first_emissions = torch.roll(first_emissions, shifts=-1, dims=2).view(
+                    self.num_models * batch_size, 1, self.max_num_states
+                )
                 init_dist_chunk *= first_emissions
             else:
                 init_dist_chunk = init_dist
-            init_dist_chunk = init_dist_chunk.view(self.num_models, batch_size * self.max_num_states, self.max_num_states).to(device=device, dtype=dtype)
-            init_dist_trans = self.transitioner(init_dist_chunk).view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
-            is_first_chunk = torch.zeros((self.num_models, batch_size // parallel_factor, parallel_factor - 1, self.max_num_states * self.max_num_states), dtype=dtype, device=device)
+            init_dist_chunk = init_dist_chunk.view(
+                self.num_models, batch_size * self.max_num_states, self.max_num_states
+            ).to(device=device, dtype=dtype)
+            init_dist_trans = self.transitioner(init_dist_chunk).view(
+                self.num_models,
+                batch_size // parallel_factor,
+                parallel_factor,
+                self.max_num_states * self.max_num_states,
+            )
+            is_first_chunk = torch.zeros(
+                (
+                    self.num_models,
+                    batch_size // parallel_factor,
+                    parallel_factor - 1,
+                    self.max_num_states * self.max_num_states,
+                ),
+                dtype=dtype,
+                device=device,
+            )
             if self.reverse:
-                is_first_chunk = torch.cat([is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2).to(device=device, dtype=dtype)
+                is_first_chunk = torch.cat(
+                    [is_first_chunk, torch.ones_like(is_first_chunk[..., :1, :])], dim=2
+                ).to(device=device, dtype=dtype)
             else:
-                is_first_chunk = torch.cat([torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2).to(device=device, dtype=dtype)
-            init_dist = init_dist.view(self.num_models, batch_size // parallel_factor, parallel_factor, self.max_num_states * self.max_num_states)
-            init_dist = is_first_chunk * init_dist + (1 - is_first_chunk) * init_dist_trans
-            init_dist = init_dist.view(self.num_models * batch_size, self.max_num_states * self.max_num_states)
-            loglik = torch.zeros((self.num_models * batch_size, self.max_num_states), dtype=dtype, device=device)
-            return [init_dist.to(device=device, dtype=dtype), loglik.to(device=device, dtype=dtype)]
+                is_first_chunk = torch.cat(
+                    [torch.ones_like(is_first_chunk[..., :1, :]), is_first_chunk], dim=2
+                ).to(device=device, dtype=dtype)
+            init_dist = init_dist.view(
+                self.num_models,
+                batch_size // parallel_factor,
+                parallel_factor,
+                self.max_num_states * self.max_num_states,
+            )
+            init_dist = (
+                is_first_chunk * init_dist + (1 - is_first_chunk) * init_dist_trans
+            )
+            init_dist = init_dist.view(
+                self.num_models * batch_size, self.max_num_states * self.max_num_states
+            )
+            loglik = torch.zeros(
+                (self.num_models * batch_size, self.max_num_states),
+                dtype=dtype,
+                device=device,
+            )
+            return [
+                init_dist.to(device=device, dtype=dtype),
+                loglik.to(device=device, dtype=dtype),
+            ]
 
     def get_aux_loss(self):
         return sum([em.get_aux_loss() for em in self.emitter])
 
     def get_prior_log_density(self):
-        em_priors = [torch.sum(em.get_prior_log_density(), dim=1) for em in self.emitter]
+        em_priors = [
+            torch.sum(em.get_prior_log_density(), dim=1) for em in self.emitter
+        ]
         trans_priors = self.transitioner.get_prior_log_densities()
         prior = sum(em_priors) + sum(trans_priors.values())
         return prior
 
     def make_reverse_direction_offspring(self):
         """Create a deep-copied cell configured for reverse-direction recursion."""
-        reverse_cell = copy.deepcopy(HmmCell(self.num_states, self.dim, self.emitter, self.transitioner))
+        reverse_cell = copy.deepcopy(
+            HmmCell(self.num_states, self.dim, self.emitter, self.transitioner)
+        )
         reverse_cell.reverse = True
         reverse_cell.transitioner.reverse = True
         reverse_cell.recurrent_init()
@@ -158,15 +239,26 @@ class HmmCell(nn.Module):
         self.reverse = reverse
         self.transitioner.reverse = reverse
 
+
 class MsaHmmCell(HmmCell):
-    """Profile-HMM cell with default emitter and transitioner wiring."""
+    """Deprecated Profile-HMM cell with default legacy component wiring."""
+
     def __init__(self, length, dim=24, emitter=None, transitioner=None, **kwargs):
+        warnings.warn(
+            "MsaHmmCell is part of the incomplete legacy Profile-HMM API and "
+            "will be removed in OrionGeno 0.2.0. Use GenePredHMMLayer for gene "
+            "prediction.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if emitter is None:
             emitter = ProfileHMMEmitter()
         if transitioner is None:
             transitioner = ProfileHMMTransitioner()
         self.length = [length] if not isinstance(length, list) else length
-        super(MsaHmmCell, self).__init__(get_num_states(self.length), dim, emitter, transitioner, **kwargs)
+        super(MsaHmmCell, self).__init__(
+            get_num_states(self.length), dim, emitter, transitioner, **kwargs
+        )
         for em in self.emitter:
             em.set_lengths(self.length)
         self.transitioner.set_lengths(self.length)

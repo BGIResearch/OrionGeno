@@ -4,10 +4,24 @@ __pycache__/
 
 .ipynb_checkpoints/
 .vscode/
+.idea/
+
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
 
 output/
 outputs/
+results/
+work/
+logs/
+data/
 checkpoints/
+experiments/
 wheels/
 .cache/
 .venv/
@@ -15,21 +29,39 @@ wheels/
 .conda-pkgs/
 .tmp/
 
+# Ignore test data but allow test code
+tests/Arabidopsis_thaliana/
+# Allow test files to be tracked
+!tests/*.py
+!tests/conftest.py
+!tests/README.md
+!tests/pytest.ini
+
 *.log
 *.tmp
 *.fna
 *.fa
 *.fasta
+*.faa
+*.fastq
+*.fq
+*.bam
+*.sam
+*.cram
+*.gff
+*.gff3
+*.gtf
 *.fna.gz
 *.fa.gz
 *.fasta.gz
+*.faa.gz
+*.fastq.gz
+*.fq.gz
 *.tar
 *.tar.gz
 *.zip
 
-!tests/**/*.fna
-!tests/**/*.fa
-!tests/**/*.fasta
-!tests/**/*.fna.gz
-!tests/**/*.fa.gz
-!tests/**/*.fasta.gz
+# Python build artifacts
+*.egg-info/
+build/
+dist/

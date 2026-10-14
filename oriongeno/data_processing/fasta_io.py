@@ -2,32 +2,20 @@
 
 from __future__ import annotations
 
-import bz2
-import gzip
 import logging
+
+from ..fasta_io import open_fasta_text
 
 
 def load_genome(genome_path):
     from Bio import SeqIO
 
-    if genome_path.endswith(".gz"):
-        with gzip.open(genome_path, "rt") as file:
-            return SeqIO.to_dict(SeqIO.parse(file, "fasta"))
-    if genome_path.endswith(".bz2"):
-        with bz2.open(genome_path, "rt") as file:
-            return SeqIO.to_dict(SeqIO.parse(file, "fasta"))
-    with open(genome_path, "r") as file:
+    with open_fasta_text(genome_path) as file:
         return SeqIO.to_dict(SeqIO.parse(file, "fasta"))
 
 
 def count_fasta_records(genome_path):
-    opener = open
-    if genome_path.endswith(".gz"):
-        opener = gzip.open
-    elif genome_path.endswith(".bz2"):
-        opener = bz2.open
-
-    with opener(genome_path, "rt") as file_obj:
+    with open_fasta_text(genome_path) as file_obj:
         return sum(1 for line in file_obj if line.startswith(">"))
 
 

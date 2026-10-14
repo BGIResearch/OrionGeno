@@ -1,0 +1,2 @@
+recursive-include tests *.py *.json
+recursive-include docs *.md *.csv *.svg
